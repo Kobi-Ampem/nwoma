@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 15mm 14mm; }
+  body { font-family: "DejaVu Serif", serif; font-size: 9.5pt; color: #111; }
+  header { text-align: right; margin-bottom: 4mm; }
+  h1 { font-size: 13pt; margin: 0; text-transform: uppercase; letter-spacing: 0.5pt; }
+  .sub { font-size: 9pt; }
+  .meta { border: 1px solid #111; padding: 2mm 3mm; margin-bottom: 5mm; }
+  .meta p { margin: 0.8mm 0; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: 8.5pt; border-top: 1px solid #111; border-bottom: 1px solid #111;
+       padding: 1.2mm 1mm; }
+  td { padding: 0.9mm 1mm; }
+  .panel td { font-style: italic; font-weight: bold; padding-top: 3mm; }
+  .flag { font-weight: bold; }
+  footer { margin-top: 10mm; font-size: 7.5pt; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>{{ report.lab_name }}</h1>
+  <div class="sub">Compte rendu d'analyses de biologie médicale</div>
+</header>
+<div class="meta">
+  <p>{{ labels.PATIENT_NAME }} : {{ report.patient_name.text }}</p>
+  <p>{{ labels.BIRTH_DATE }} : {{ report.birth_date.text }}</p>
+  <p>{{ labels.SEX }} : {{ report.sex.text }}</p>
+  <p>{{ labels.COLLECTION_DATE }} : {{ report.collected_on.text }}</p>
+  <p>{{ labels.CLINICIAN }} : Dr {{ report.clinician.text }}</p>
+</div>
+<table>
+  <tr><th>Analyse</th><th>Résultat</th><th>Unité</th><th>Valeurs de référence</th><th></th></tr>
+  {% for title, rows in groups %}
+  <tr class="panel"><td colspan="5">{{ title }}</td></tr>
+  {% for idx, row in rows %}
+  <tr>
+    <td>{{ row.name.text }}</td>
+    <td>{{ row.value.text }}</td>
+    <td>{{ row.unit.text if row.unit else "" }}</td>
+    <td>{{ row.ref_range.text if row.ref_range else "" }}</td>
+    <td class="flag">{{ row.flag.text if row.flag else "" }}</td>
+  </tr>
+  {% endfor %}
+  {% endfor %}
+</table>
+<footer>Document synthétique généré pour des tests logiciels. Il ne concerne aucun patient réel.</footer>
+</body>
+</html>
