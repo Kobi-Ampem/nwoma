@@ -1,0 +1,46 @@
+[project]
+name = "nwoma"
+version = "0.0.1"
+description = "Bilingual clinical document extraction: fine-tuned transformer + LLM cascade, evals, FHIR export"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Kobi Ampem Afriyie" }]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "faker>=40.43.0",
+    "jinja2>=3.1.6",
+    "pdfplumber>=0.11.10",
+    "pydantic>=2.8",
+    "weasyprint>=70.0",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.11",
+    "pre-commit>=3.8",
+    "pytest>=8.3",
+    "ruff>=0.6",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+exclude = ["^web/", "^infra/"]
+
+[[tool.mypy.overrides]]
+module = ["weasyprint"]  # ships no type information
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Generated data and model weights (reproducible from code, too large for git)
+data/
+models/
+synthea/output/
+*.onnx
+*.jar
+
+# Secrets
+.env
+.env.*
+
+# Node
+node_modules/
+web/dist/
+
+# AWS SAM
+.aws-sam/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
