@@ -4,7 +4,7 @@ from datetime import date
 import pytest
 from faker import Faker
 
-from datagen.build import split_for
+from datagen.build import sample, split_for
 from datagen.catalogue import BY_CODE, CATALOGUE
 from datagen.compose import compose_report
 from datagen.formatting import fmt_date, fmt_name, fmt_number, fmt_range
@@ -105,3 +105,16 @@ def test_alternate_specimen_codes_map_to_one_test() -> None:
     assert BY_CODE["2339-0"].loinc == "2345-7"
     codes = [t.loinc for t in CATALOGUE]
     assert len(codes) == len(set(codes))
+
+
+def test_sample_caps_visits_per_patient() -> None:
+    # One chronically ill patient with 50 visits, plus 10 patients with one visit each.
+    heavy = [_visit().model_copy(update={"visit_id": f"heavy-{i}"}) for i in range(50)]
+    light = [
+        _visit().model_copy(update={"visit_id": f"light-{i}", "patient_id": f"p-{i}"})
+        for i in range(10)
+    ]
+    chosen = sample(heavy + light, k=100, rng=random.Random(0), per_patient=2)
+    assert sum(v.patient_id == "patient-1" for v in chosen) == 2
+    assert len(chosen) == 12
+    assert len({v.visit_id for v in chosen}) == 12

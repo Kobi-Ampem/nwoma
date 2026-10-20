@@ -24,17 +24,29 @@ from datagen.synthea_loader import load_lab_visits
 from ocr.text_layer import OCR_DPI, ocr_image, pdf_pages_as_images, pdf_text
 
 
-def sample(visits: Iterable[SourceLabVisit], k: int, rng: random.Random) -> list[SourceLabVisit]:
-    """Reservoir sampling: a uniform sample of k visits while holding only k in memory."""
-    chosen: list[SourceLabVisit] = []
-    for i, visit in enumerate(visits):
-        if i < k:
-            chosen.append(visit)
+def sample(
+    visits: Iterable[SourceLabVisit], k: int, rng: random.Random, per_patient: int = 2
+) -> list[SourceLabVisit]:
+    """A uniform sample of k visits, at most `per_patient` from any one patient.
+
+    Visits per patient are heavily skewed (median 1, max 260 in a 5,000-patient run), so
+    sampling visits directly would fill the dataset with a few chronically ill patients.
+    Each patient keeps a reservoir of `per_patient` visits, so memory stays small.
+    """
+    pools: dict[str, list[SourceLabVisit]] = {}
+    seen: Counter[str] = Counter()
+    for visit in visits:
+        pool = pools.setdefault(visit.patient_id, [])
+        i = seen[visit.patient_id]
+        seen[visit.patient_id] += 1
+        if i < per_patient:
+            pool.append(visit)
         else:
             j = rng.randint(0, i)
-            if j < k:
-                chosen[j] = visit
-    return chosen
+            if j < per_patient:
+                pool[j] = visit
+    candidates = [visit for pool in pools.values() for visit in pool]
+    return rng.sample(candidates, min(k, len(candidates)))
 
 
 def split_for(patient_id: str) -> DataSplit:
@@ -107,14 +119,17 @@ def main() -> None:
     parser.add_argument("--fr-share", type=float, default=0.5)
     parser.add_argument("--scan-share", type=float, default=0.5)
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--per-patient", type=int, default=2)
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
     pdf_dir = args.out / "pdf"
     pdf_dir.mkdir(parents=True, exist_ok=True)
+    for stale in pdf_dir.glob("*.pdf"):  # PDFs from an earlier run have no label any more
+        stale.unlink()
 
     jobs: list[Job] = []
-    for visit in sample(load_lab_visits(args.synthea), args.n, rng):
+    for visit in sample(load_lab_visits(args.synthea), args.n, rng, args.per_patient):
         split = split_for(visit.patient_id)
         lang: Lang = "fr" if rng.random() < args.fr_share else "en"
         # Only the unseen-layout test split uses held-out layouts.

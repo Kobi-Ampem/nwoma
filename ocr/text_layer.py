@@ -4,6 +4,7 @@ This is the runtime entry point the API uses, so it must not depend on the data 
 """
 
 import io
+import os
 import subprocess
 from typing import Literal
 
@@ -24,7 +25,10 @@ def pdf_text(pdf: bytes) -> str:
 
 def ocr_image(image: Image.Image, langs: str = "eng+fra") -> str:
     """Run Tesseract on one page image. PSM 6 reads the page as one block of text, which keeps
-    each table row on one line."""
+    each table row on one line.
+
+    Tesseract is limited to one thread: callers parallelise across pages or documents, and
+    Tesseract's own OpenMP threads spin while waiting, so oversubscribed cores slow it ~15x."""
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
     result = subprocess.run(
@@ -32,6 +36,7 @@ def ocr_image(image: Image.Image, langs: str = "eng+fra") -> str:
         input=buffer.getvalue(),
         capture_output=True,
         check=True,
+        env={**os.environ, "OMP_THREAD_LIMIT": "1"},
     )
     return result.stdout.decode("utf-8").rstrip("\n\f")
 
