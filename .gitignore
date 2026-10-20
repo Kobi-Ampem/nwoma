@@ -18,6 +18,7 @@ synthea/output/
 # Secrets
 .env
 .env.*
+!.env.example
 
 # Node
 node_modules/
