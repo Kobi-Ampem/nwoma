@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="{{ layout.lang }}">
+<head>
+<meta charset="utf-8">
+<style>
+  @page { size: A4; margin: 15mm; }
+  body { font-family: {{ layout.font | safe }}; font-size: 9.5pt; color: #111; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 1mm; text-align: left; vertical-align: top; }
+  .results { margin-top: 5mm; }
+  .results th { border-bottom: 1px solid #111; }
+  .panel td { font-weight: bold; padding-top: 3mm; }
+  .flag { font-weight: bold; }
+  footer { margin-top: 10mm; font-size: 7.5pt; color: #444; }
+  {% block style %}{% endblock %}
+</style>
+</head>
+<body>
+{% block header %}{% endblock %}
+{% block results %}
+<table class="results">
+  <tr>{% for col in layout.columns %}<th>{{ layout.headings[col] }}</th>{% endfor %}</tr>
+  {% for title, rows in groups %}
+  <tr class="panel"><td colspan="{{ layout.columns | length }}">{{ title }}</td></tr>
+  {% for cells in rows %}
+  <tr>{% for col, text in cells %}<td class="{{ col }}">{{ text }}</td>{% endfor %}</tr>
+  {% endfor %}
+  {% endfor %}
+</table>
+{% endblock %}
+<footer>{{ footer }}</footer>
+</body>
+</html>

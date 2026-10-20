@@ -48,6 +48,7 @@ class SourceResult(BaseModel):
 
 class SourceLabVisit(BaseModel):
     visit_id: str
+    patient_id: str
     patient: SourcePatient
     collected_on: date
     clinician: str
@@ -86,8 +87,14 @@ class Span(BaseModel):
     end: int
 
 
+DataSplit = Literal["train", "dev", "test", "test_unseen"]
+
+
 class LabeledDoc(BaseModel):
     doc_id: str
+    split: DataSplit
+    source: Literal["digital", "scan"]
+    lost_spans: int  # labels OCR destroyed entirely (scans only)
     lang: Lang
     template: str
     source_visit: str

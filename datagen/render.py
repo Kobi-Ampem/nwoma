@@ -4,23 +4,35 @@ Spans are located in the text the extractor will actually see (the PDF text laye
 HTML source, because layout changes spacing and line breaks.
 """
 
-import io
 from itertools import groupby
 from pathlib import Path
 
-import pdfplumber
 import weasyprint
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from datagen.catalogue import PANELS
-from datagen.compose import HEADER_LABELS
-from datagen.models import EntityType, Field, LabReport, Span
+from datagen.layouts import LAYOUTS, Column, Layout
+from datagen.models import EntityType, Field, LabReport, Lang, ResultRow, Span
 
 TEMPLATE_DIR = Path(__file__).parent / "templates"
 
 _env = Environment(
     loader=FileSystemLoader(TEMPLATE_DIR), autoescape=True, undefined=StrictUndefined
 )
+
+_FOOTER: dict[Lang, str] = {
+    "en": "Synthetic document generated for software testing. It does not describe a real patient.",
+    "fr": "Document synthétique généré pour des tests logiciels. "
+    "Il ne concerne aucun patient réel.",
+}
+
+_COLUMN_ENTITY: dict[Column, EntityType] = {
+    "name": "TEST_NAME",
+    "value": "TEST_VALUE",
+    "unit": "TEST_UNIT",
+    "ref": "REF_RANGE",
+    "flag": "FLAG",
+}
 
 # How far after its label a header value may start, in characters.
 _HEADER_WINDOW = 40
@@ -30,21 +42,39 @@ class SpanNotFoundError(ValueError):
     pass
 
 
+def _cell(row: ResultRow, column: Column) -> Field | None:
+    return {
+        "name": row.name,
+        "value": row.value,
+        "unit": row.unit,
+        "ref": row.ref_range,
+        "flag": row.flag,
+    }[column]
+
+
+def _display(row: ResultRow, column: Column, layout: Layout) -> str:
+    field = _cell(row, column)
+    if field is None:
+        return ""
+    if column == "ref" and layout.ref_brackets:
+        return f"({field.text})"
+    return field.text
+
+
 def render_pdf(report: LabReport) -> bytes:
+    layout = LAYOUTS[report.template]
     groups = [
-        (PANELS[panel][report.lang], list(rows))
-        for panel, rows in groupby(enumerate(report.results), key=lambda r: r[1].panel)
+        (
+            PANELS[panel][report.lang],
+            [[(col, _display(row, col, layout)) for col in layout.columns] for row in rows],
+        )
+        for panel, rows in groupby(report.results, key=lambda r: r.panel)
     ]
-    html = _env.get_template(f"{report.template}.html.j2").render(
-        report=report, labels=HEADER_LABELS[report.lang], groups=groups
+    html = _env.get_template(f"{layout.skeleton}.html.j2").render(
+        report=report, layout=layout, groups=groups, footer=_FOOTER[report.lang]
     )
     pdf: bytes = weasyprint.HTML(string=html).write_pdf()
     return pdf
-
-
-def extract_text(pdf: bytes) -> str:
-    with pdfplumber.open(io.BytesIO(pdf)) as doc:
-        return "\n".join(page.extract_text() or "" for page in doc.pages)
 
 
 def _span(label: EntityType, row: int | None, field: Field, start: int) -> Span:
@@ -59,8 +89,8 @@ def _span(label: EntityType, row: int | None, field: Field, start: int) -> Span:
 
 
 def locate_spans(text: str, report: LabReport) -> list[Span]:
+    layout = LAYOUTS[report.template]
     spans: list[Span] = []
-    labels = HEADER_LABELS[report.lang]
     header: list[tuple[EntityType, Field]] = [
         ("PATIENT_NAME", report.patient_name),
         ("BIRTH_DATE", report.birth_date),
@@ -69,16 +99,17 @@ def locate_spans(text: str, report: LabReport) -> list[Span]:
         ("CLINICIAN", report.clinician),
     ]
     for label, field in header:
-        anchor = text.find(labels[label])
+        anchor_text = layout.anchor(label)
+        anchor = text.find(anchor_text)
         if anchor < 0:
-            raise SpanNotFoundError(f"{report.doc_id}: header label {labels[label]!r} missing")
-        after = anchor + len(labels[label])
+            raise SpanNotFoundError(f"{report.doc_id}: header label {anchor_text!r} missing")
+        after = anchor + len(anchor_text)
         start = text.find(field.text, after, after + _HEADER_WINDOW + len(field.text))
         if start < 0:
             raise SpanNotFoundError(f"{report.doc_id}: {label} {field.text!r} not after its label")
         spans.append(_span(label, None, field, start))
 
-    # Each result is one table row, so it must sit on one line that starts with the test name.
+    # Each result is one row, so it must sit on one line that starts with the test name.
     lines: list[tuple[int, str]] = []
     offset = 0
     for line in text.split("\n"):
@@ -94,16 +125,13 @@ def locate_spans(text: str, report: LabReport) -> list[Span]:
         line_start, line = lines[line_idx]
         line_end = line_start + len(line)
         cursor = line_start
-        cells: list[tuple[EntityType, Field | None]] = [
-            ("TEST_NAME", row.name),
-            ("TEST_VALUE", row.value),
-            ("TEST_UNIT", row.unit),
-            ("REF_RANGE", row.ref_range),
-            ("FLAG", row.flag),
-        ]
-        for label, cell in cells:
+        # Cells are searched in the layout's column order, so a flag "L" is never matched
+        # inside a unit such as "mmol/L" that comes before it.
+        for column in layout.columns:
+            cell = _cell(row, column)
             if cell is None:
                 continue
+            label = _COLUMN_ENTITY[column]
             start = text.find(cell.text, cursor, line_end)
             if start < 0:
                 raise SpanNotFoundError(

@@ -1,4 +1,4 @@
-"""Turn a language-neutral Synthea visit into a printed lab report in English or French."""
+"""Turn a language-neutral Synthea visit into a printed lab report for one layout."""
 
 import hashlib
 import random
@@ -6,42 +6,19 @@ import random
 from faker import Faker
 
 from datagen.catalogue import BY_CODE, CATALOGUE, PANEL_ORDER, LabTest
-from datagen.formatting import fmt_date, fmt_number, fmt_range
-from datagen.models import Field, LabReport, Lang, ResultRow, SourceLabVisit
-
-# Header labels printed on the document. The span locator anchors on these strings.
-HEADER_LABELS: dict[Lang, dict[str, str]] = {
-    "en": {
-        "PATIENT_NAME": "Patient name",
-        "BIRTH_DATE": "Date of birth",
-        "SEX": "Sex",
-        "COLLECTION_DATE": "Collected",
-        "CLINICIAN": "Requesting clinician",
-    },
-    "fr": {
-        "PATIENT_NAME": "Nom du patient",
-        "BIRTH_DATE": "Date de naissance",
-        "SEX": "Sexe",
-        "COLLECTION_DATE": "Date de prélèvement",
-        "CLINICIAN": "Prescripteur",
-    },
-}
-
-_SEX_TEXT: dict[Lang, dict[str, str]] = {
-    "en": {"M": "Male", "F": "Female"},
-    "fr": {"M": "Masculin", "F": "Féminin"},
-}
-# French reports flag low results "B" (bas).
-_FLAG_TEXT: dict[Lang, dict[str, str]] = {"en": {"H": "H", "L": "L"}, "fr": {"H": "H", "L": "B"}}
+from datagen.formatting import fmt_date, fmt_flag, fmt_name, fmt_number, fmt_range, fmt_sex
+from datagen.layouts import Layout
+from datagen.models import Field, LabReport, ResultRow, SourceLabVisit
 
 _CATALOGUE_INDEX = {t.loinc: i for i, t in enumerate(CATALOGUE)}
 
 
-def _doc_id(visit_id: str, lang: Lang, template: str) -> str:
-    return hashlib.sha256(f"{visit_id}|{lang}|{template}".encode()).hexdigest()[:12]
+def _doc_id(visit_id: str, layout: str) -> str:
+    return hashlib.sha256(f"{visit_id}|{layout}".encode()).hexdigest()[:12]
 
 
-def _result_row(test: LabTest, raw: float, lang: Lang, rng: random.Random) -> ResultRow:
+def _result_row(test: LabTest, raw: float, layout: Layout, rng: random.Random) -> ResultRow:
+    lang = layout.lang
     factor = test.fr_factor if lang == "fr" else 1.0
     decimals = test.decimals_fr if lang == "fr" else test.decimals_en
     value = round(raw * factor, decimals)
@@ -52,6 +29,8 @@ def _result_row(test: LabTest, raw: float, lang: Lang, rng: random.Random) -> Re
     high_text = fmt_number(high, decimals, lang) if high is not None else None
     range_text = fmt_range(low_text, high_text)
 
+    # Flags compare the printed (rounded) value with the printed range on purpose: a document must
+    # agree with itself. Flagging the raw 145.4 against 145 would print "145  136 - 145  H".
     flag: str | None = None
     if high is not None and value > high:
         flag = "H"
@@ -68,29 +47,28 @@ def _result_row(test: LabTest, raw: float, lang: Lang, rng: random.Random) -> Re
         ref_range=(
             Field(
                 text=range_text,
-                value=f"{low if low is not None else ''}-" f"{high if high is not None else ''}",
+                value=f"{low if low is not None else ''}-{high if high is not None else ''}",
             )
             if range_text
             else None
         ),
-        flag=Field(text=_FLAG_TEXT[lang][flag], value=flag) if flag else None,
+        flag=Field(text=fmt_flag(flag, lang, layout.flag_style), value=flag) if flag else None,
     )
 
 
 def compose_report(
-    visit: SourceLabVisit, lang: Lang, template: str, rng: random.Random, fake: Faker
+    visit: SourceLabVisit, layout: Layout, rng: random.Random, fake: Faker
 ) -> LabReport:
+    lang = layout.lang
     patient = visit.patient
     if lang == "fr":
         # Synthea's people are American; French documents get French names.
         given = fake.first_name_female() if patient.sex == "F" else fake.first_name_male()
         family = fake.last_name()
-        name_text = f"{family.upper()} {given}"
         clinician = fake.name()
         lab_name = f"Laboratoire {fake.last_name()}"
     else:
         given, family = patient.given, patient.family
-        name_text = f"{given} {family}"
         clinician = visit.clinician
         lab_name = visit.organisation
 
@@ -99,18 +77,22 @@ def compose_report(
         key=lambda r: (PANEL_ORDER.index(BY_CODE[r.loinc].panel), _CATALOGUE_INDEX[r.loinc]),
     )
     return LabReport(
-        doc_id=_doc_id(visit.visit_id, lang, template),
+        doc_id=_doc_id(visit.visit_id, layout.name),
         lang=lang,
-        template=template,
+        template=layout.name,
         lab_name=lab_name,
-        patient_name=Field(text=name_text, value=f"{given} {family}"),
-        birth_date=Field(
-            text=fmt_date(patient.birth_date, lang), value=patient.birth_date.isoformat()
+        patient_name=Field(
+            text=fmt_name(given, family, layout.name_style), value=f"{given} {family}"
         ),
-        sex=Field(text=_SEX_TEXT[lang][patient.sex], value=patient.sex),
+        birth_date=Field(
+            text=fmt_date(patient.birth_date, lang, layout.date_style),
+            value=patient.birth_date.isoformat(),
+        ),
+        sex=Field(text=fmt_sex(patient.sex, lang, layout.sex_style), value=patient.sex),
         collected_on=Field(
-            text=fmt_date(visit.collected_on, lang), value=visit.collected_on.isoformat()
+            text=fmt_date(visit.collected_on, lang, layout.date_style),
+            value=visit.collected_on.isoformat(),
         ),
         clinician=Field(text=clinician, value=clinician),
-        results=[_result_row(BY_CODE[r.loinc], r.value, lang, rng) for r in ordered],
+        results=[_result_row(BY_CODE[r.loinc], r.value, layout, rng) for r in ordered],
     )

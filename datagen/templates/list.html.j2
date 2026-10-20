@@ -1,0 +1,32 @@
+{# Held-out skeleton: no training layout uses it. #}
+{% extends "base.html.j2" %}
+{% from "_macros.html.j2" import field with context %}
+{% block style %}
+  h1 { font-size: 14pt; margin: 0 0 1mm 0; }
+  .title { font-variant: small-caps; margin-bottom: 3mm; }
+  .meta { margin: 0.6mm 0; }
+  h3 { font-size: 10pt; margin: 4mm 0 1mm 0; border-bottom: 1px solid #111; }
+  .row { display: flex; margin: 0.8mm 0; }
+  .lead { flex: 1; border-bottom: 1px dotted #777; margin: 0 2mm 1.2mm 2mm; }
+{% endblock %}
+{% block header %}
+<h1>{{ report.lab_name }}</h1>
+<div class="title">{{ layout.title }}</div>
+<div class="meta">{{ field("PATIENT_NAME", report.patient_name) }}</div>
+<div class="meta">
+  {{ field("BIRTH_DATE", report.birth_date) }} &nbsp;&nbsp; {{ field("SEX", report.sex) }}
+</div>
+<div class="meta">{{ field("COLLECTION_DATE", report.collected_on) }}</div>
+<div class="meta">{{ field("CLINICIAN", report.clinician, layout.clinician_prefix) }}</div>
+{% endblock %}
+{% block results %}
+{% for title, rows in groups %}
+<h3>{{ title }}</h3>
+{% for cells in rows %}
+<div class="row">
+  <span>{{ cells[0][1] }}</span><span class="lead"></span>
+  <span>{% for col, text in cells[1:] %}{% if text %}{{ text }} {% endif %}{% endfor %}</span>
+</div>
+{% endfor %}
+{% endfor %}
+{% endblock %}

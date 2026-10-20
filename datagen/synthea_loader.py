@@ -37,31 +37,37 @@ def load_lab_visits(csv_dir: Path, min_results: int = 5) -> Iterator[SourceLabVi
     providers = {r["Id"]: _clean_name(r["NAME"]) for r in _rows(csv_dir / "providers.csv")}
     organisations = {r["Id"]: r["NAME"] for r in _rows(csv_dir / "organizations.csv")}
 
-    results: dict[str, dict[str, SourceResult]] = defaultdict(dict)
-    visit_meta: dict[str, tuple[str, date]] = {}
+    # (priority, result) per encounter and canonical test. Synthea often records a blood and a
+    # serum variant of the same test in one encounter; the canonical (serum) code wins, then the
+    # first row seen, so the printed value never depends on CSV row order.
+    results: dict[str, dict[str, tuple[int, SourceResult]]] = defaultdict(dict)
+    patient_of: dict[str, str] = {}
     for r in _rows(csv_dir / "observations.csv"):
         if r["CATEGORY"] != "laboratory" or r["TYPE"] != "numeric":
             continue
         test = BY_CODE.get(r["CODE"])
         if test is None:
             continue
-        # Keyed by canonical code: a blood and a serum variant of one test collapse to one row.
-        results[r["ENCOUNTER"]][test.loinc] = SourceResult(
-            loinc=test.loinc, value=float(r["VALUE"])
-        )
-        visit_meta[r["ENCOUNTER"]] = (r["PATIENT"], date.fromisoformat(r["DATE"][:10]))
+        priority = 0 if r["CODE"] == test.loinc else 1
+        current = results[r["ENCOUNTER"]].get(test.loinc)
+        if current is None or priority < current[0]:
+            result = SourceResult(loinc=test.loinc, value=float(r["VALUE"]))
+            results[r["ENCOUNTER"]][test.loinc] = (priority, result)
+        patient_of[r["ENCOUNTER"]] = r["PATIENT"]
 
     wanted = {e for e, rs in results.items() if len(rs) >= min_results}
     for r in _rows(csv_dir / "encounters.csv"):
         encounter = r["Id"]
         if encounter not in wanted:
             continue
-        patient_id, collected_on = visit_meta[encounter]
+        patient_id = patient_of[encounter]
         yield SourceLabVisit(
             visit_id=encounter,
+            patient_id=patient_id,
             patient=patients[patient_id],
-            collected_on=collected_on,
+            # The encounter's own start date: observations within one visit can span midnight.
+            collected_on=date.fromisoformat(r["START"][:10]),
             clinician=providers.get(r["PROVIDER"], "Unknown"),
             organisation=organisations.get(r["ORGANIZATION"], "Clinical Laboratory"),
-            results=list(results[encounter].values()),
+            results=[result for _, result in results[encounter].values()],
         )

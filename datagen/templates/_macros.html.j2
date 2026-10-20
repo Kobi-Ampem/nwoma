@@ -1,0 +1,4 @@
+{# One header field: label, separator, then the value the span locator looks for. #}
+{% macro field(entity, f, prefix="") -%}
+{{ layout.labels[entity] }}{{ layout.separator }}{{ prefix }}{{ f.text }}
+{%- endmacro %}

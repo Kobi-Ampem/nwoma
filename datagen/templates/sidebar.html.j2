@@ -1,0 +1,26 @@
+{% extends "base.html.j2" %}
+{% from "_macros.html.j2" import field with context %}
+{% block style %}
+  .top td { width: 50%; }
+  .lab { font-size: 13pt; font-weight: bold; }
+  .patient { background: #eee; padding: 2mm 3mm; }
+  .patient div { margin: 0.6mm 0; }
+  .results th { background: #222; color: #fff; }
+{% endblock %}
+{% block header %}
+<table class="top">
+  <tr>
+    <td>
+      <div class="lab">{{ report.lab_name }}</div>
+      <div>{{ layout.title }}</div>
+    </td>
+    <td class="patient">
+      <div>{{ field("PATIENT_NAME", report.patient_name) }}</div>
+      <div>{{ field("BIRTH_DATE", report.birth_date) }}</div>
+      <div>{{ field("SEX", report.sex) }}</div>
+    </td>
+  </tr>
+</table>
+<p>{{ field("COLLECTION_DATE", report.collected_on) }}</p>
+<p>{{ field("CLINICIAN", report.clinician, layout.clinician_prefix) }}</p>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "base.html.j2" %}
+{% from "_macros.html.j2" import field with context %}
+{% block style %}
+  header { border-bottom: 2px solid #111; padding-bottom: 3mm; margin-bottom: 4mm; }
+  h1 { font-size: 15pt; margin: 0; }
+  .sub { font-size: 9pt; color: #444; }
+  .meta td { width: 50%; }
+{% endblock %}
+{% block header %}
+<header>
+  <h1>{{ report.lab_name }}</h1>
+  <div class="sub">{{ layout.title }}</div>
+</header>
+<table class="meta">
+  <tr>
+    <td>{{ field("PATIENT_NAME", report.patient_name) }}</td>
+    <td>{{ field("BIRTH_DATE", report.birth_date) }}</td>
+  </tr>
+  <tr>
+    <td>{{ field("SEX", report.sex) }}</td>
+    <td>{{ field("COLLECTION_DATE", report.collected_on) }}</td>
+  </tr>
+  <tr><td colspan="2">{{ field("CLINICIAN", report.clinician, layout.clinician_prefix) }}</td></tr>
+</table>
+{% endblock %}
