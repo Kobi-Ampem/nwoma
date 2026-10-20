@@ -50,7 +50,10 @@ def project_spans(source: str, spans: list[Span], target: str) -> tuple[list[Spa
             start += 1
         while end > start and target[end - 1].isspace():
             end -= 1
-        if start >= end:
+        # A misread field stays about its printed length. A span that grew far longer, or across
+        # lines, was stretched over OCR junk by the alignment: its true position is unknown.
+        stretched = end - start > 2 * len(span.text) + 3 or "\n" in target[start:end]
+        if start >= end or stretched:
             lost += 1
             continue
         projected.append(

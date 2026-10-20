@@ -30,6 +30,19 @@ def test_projection_reports_spans_ocr_deleted() -> None:
     assert projected == [] and lost == 1
 
 
+def test_projection_drops_spans_stretched_over_ocr_junk() -> None:
+    # OCR turned the flag and its neighbours into noise; the flag must not cover the noise.
+    projected, lost = project_spans(
+        "Glucose 140 H\nUrea 5", [_span("H", 12, "FLAG")], "Glucose 140 ee oe a\nfo ee Urea 5"
+    )
+    assert projected == [] and lost == 1
+
+
+def test_projection_keeps_a_short_misread() -> None:
+    projected, lost = project_spans("Flag \u2193 end", [_span("\u2193", 5, "FLAG")], "Flag 4 end")
+    assert lost == 0 and projected[0].text == "4"
+
+
 def test_scanned_pdf_has_no_text_layer_and_is_read_by_ocr() -> None:
     pdf = render_pdf(_report(LAYOUTS["lab_en_01"]))
     pages = [degrade(p, random.Random(0)) for p in pdf_pages_as_images(pdf, OCR_DPI)]
