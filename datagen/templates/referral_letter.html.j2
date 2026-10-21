@@ -1,0 +1,4 @@
+{% extends "referral_base.html.j2" %}
+{% block style %} .greet { margin-top: 4mm; } {% endblock %}
+{% block header %}<p style="text-align:right"><b>{{ letter.clinic_name }}</b><br>{{ letter.written }}</p>
+<p>{{ h.to }} {{ letter.specialty }}</p><p class="greet">{{ h.dear }}</p>{% endblock %}

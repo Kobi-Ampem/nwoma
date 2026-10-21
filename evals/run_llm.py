@@ -19,22 +19,31 @@ from dotenv import load_dotenv
 
 from datagen.layouts import LAYOUTS
 from datagen.models import LabeledDoc
+from datagen.referral import REFERRAL_LAYOUTS
 from evals.score import HEADER, ROW, all_correct, prf, score_doc
 from extract.llm import GeminiExtractor, LLMResult, QuotaExhausted
 
 
-def sample_docs(path: Path, splits: list[str], per_split: int, seed: int) -> list[LabeledDoc]:
-    by_split: dict[str, list[LabeledDoc]] = defaultdict(list)
+def sample_docs(
+    path: Path, splits: list[str], per_split: int, seed: int, per_split_referral: int = 0
+) -> list[LabeledDoc]:
+    """A fixed sample: `per_split` lab reports and `per_split_referral` referral letters per split.
+
+    Each document type is drawn from its own random stream, so adding letters leaves the lab
+    sample exactly as before, and its cached extractions still apply.
+    """
+    by_key: dict[tuple[str, str], list[LabeledDoc]] = defaultdict(list)
     with path.open(encoding="utf-8") as f:
         for line in f:
             doc = LabeledDoc.model_validate_json(line)
             if doc.split in splits:
-                by_split[doc.split].append(doc)
-    rng = random.Random(seed)
+                by_key[(doc.report.doc_type, doc.split)].append(doc)
     chosen: list[LabeledDoc] = []
-    for split in splits:
-        docs = sorted(by_split[split], key=lambda d: d.doc_id)
-        chosen += rng.sample(docs, min(per_split, len(docs)))
+    for offset, (doc_type, n) in enumerate((("lab", per_split), ("referral", per_split_referral))):
+        rng = random.Random(seed + offset)
+        for split in splits:
+            docs = sorted(by_key[(doc_type, split)], key=lambda d: d.doc_id)
+            chosen += rng.sample(docs, min(n, len(docs)))
     return chosen
 
 
@@ -56,7 +65,8 @@ def report(
         counts = score_doc(doc, results[doc.doc_id].extraction)
         total += counts
         # Skeleton separates the fresh held-out layouts (ledger) from ones already examined (list).
-        skeleton = f"skeleton={LAYOUTS[doc.template].skeleton}"
+        layout = LAYOUTS.get(doc.template) or REFERRAL_LAYOUTS[doc.template]
+        skeleton = f"skeleton={layout.skeleton}"
         for key in (
             "all",
             f"split={doc.split}",
@@ -112,6 +122,7 @@ def main() -> None:
     parser.add_argument("--labels", type=Path, default=Path("data/docs/labels.jsonl"))
     parser.add_argument("--splits", nargs="+", default=["test", "test_unseen"])
     parser.add_argument("--per-split", type=int, default=100)
+    parser.add_argument("--per-split-referral", type=int, default=0)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--model", default=os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite"))
     parser.add_argument("--rpm", type=float, default=10, help="requests per minute to stay under")
@@ -122,7 +133,7 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=Path("evals/results"))
     args = parser.parse_args()
 
-    docs = sample_docs(args.labels, args.splits, args.per_split, args.seed)
+    docs = sample_docs(args.labels, args.splits, args.per_split, args.seed, args.per_split_referral)
     extractor = GeminiExtractor(args.model, args.cache, None, 60 / args.rpm, args.thinking)
     results: dict[str, LLMResult] = {}
     stopped = False

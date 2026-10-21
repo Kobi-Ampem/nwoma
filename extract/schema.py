@@ -15,10 +15,34 @@ class ExtractedResult(BaseModel):
     flag: str | None = Field(description="Abnormal flag as printed, e.g. 'H', 'Bas', '↑'")
 
 
+class ExtractedMedication(BaseModel):
+    name: str = Field(description="Medication name as printed, e.g. 'Metformine LP'")
+    dose: str | None = Field(description="Dose as printed, e.g. '500 mg'")
+    frequency: str | None = Field(description="Frequency as printed, e.g. 'twice daily'")
+
+
 class Extraction(BaseModel):
+    """Lab reports fill the first part, referral letters the second; the rest stays empty."""
+
     patient_name: str | None = Field(description="Patient name as printed")
     birth_date: str | None = Field(description="Date of birth as printed")
     sex: str | None = Field(description="Sex as printed")
-    collection_date: str | None = Field(description="Sample collection date as printed")
-    clinician: str | None = Field(description="Requesting clinician as printed")
-    results: list[ExtractedResult] = Field(description="One entry per test result row")
+    collection_date: str | None = Field(
+        default=None, description="Lab reports: sample collection date as printed"
+    )
+    clinician: str | None = Field(description="Requesting or referring clinician as printed")
+    results: list[ExtractedResult] = Field(
+        default_factory=list, description="Lab reports: one entry per test result row"
+    )
+    reason: str | None = Field(
+        default=None, description="Referral letters: the reason for referral as printed"
+    )
+    diagnoses: list[str] = Field(
+        default_factory=list, description="Referral letters: each diagnosis as printed"
+    )
+    medications: list[ExtractedMedication] = Field(
+        default_factory=list, description="Referral letters: each current medication"
+    )
+    allergies: list[str] = Field(
+        default_factory=list, description="Referral letters: each allergy as printed"
+    )

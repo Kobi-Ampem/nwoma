@@ -21,12 +21,13 @@ def main() -> None:
     parser.add_argument("--labels", type=Path, default=Path("data/docs/labels.jsonl"))
     parser.add_argument("--splits", nargs="+", default=["test", "test_unseen"])
     parser.add_argument("--per-split", type=int, default=100)
+    parser.add_argument("--per-split-referral", type=int, default=0)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--model-dir", type=Path, default=Path("models/ner"))
     parser.add_argument("--out", type=Path, default=Path("evals/results"))
     args = parser.parse_args()
 
-    docs = sample_docs(args.labels, args.splits, args.per_split, args.seed)
+    docs = sample_docs(args.labels, args.splits, args.per_split, args.seed, args.per_split_referral)
     extractor = NerExtractor.from_onnx(args.model_dir)
     extractor.extract(docs[0].text)  # warm-up: the first call loads and optimises the graph
     results: dict[str, LLMResult] = {}

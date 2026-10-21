@@ -14,7 +14,7 @@ This module has no PyTorch dependency: the API uses `decode` and `to_extraction`
 from typing import Any, get_args
 
 from datagen.models import EntityType, Span
-from extract.schema import ExtractedResult, Extraction
+from extract.schema import ExtractedMedication, ExtractedResult, Extraction
 
 ENTITY_TYPES: list[str] = list(get_args(EntityType))
 LABELS = ["O"] + [f"{p}-{t}" for t in ENTITY_TYPES for p in ("B", "I")]
@@ -29,7 +29,9 @@ _HEADER = {
     "SEX": "sex",
     "COLLECTION_DATE": "collection_date",
     "CLINICIAN": "clinician",
+    "REASON": "reason",
 }
+_MEDICATION = {"MEDICATION": "name", "DOSE": "dose", "FREQUENCY": "frequency"}
 _ROW = {
     "TEST_NAME": "test_name",
     "TEST_VALUE": "value",
@@ -111,26 +113,37 @@ def decode(offsets: list[tuple[int, int]], label_ids: list[int]) -> list[tuple[s
 def to_extraction(text: str, spans: list[tuple[str, int, int]]) -> Extraction:
     """Assemble spans into the shared output shape.
 
-    Header fields keep their first occurrence. A test name starts a new result row; any other
-    row field joins the current row, or starts a new one if the current row already has it.
+    Header fields keep their first occurrence. A test name starts a new result row and a
+    medication name a new medication row; any other row field joins the current row, or starts a
+    new one if the current row already has it. Diagnoses and allergies are plain lists.
     """
     header: dict[str, str] = {}
     rows: list[dict[str, str]] = []
+    meds: list[dict[str, str]] = []
+    lists: dict[str, list[str]] = {"DIAGNOSIS": [], "ALLERGY": []}
     for label, start, end in spans:
-        value = text[start:end]
+        value = " ".join(text[start:end].split())  # a wrapped field reads as one line
         if label in _HEADER:
             header.setdefault(_HEADER[label], value)
-            continue
-        field = _ROW[label]
-        if label == "TEST_NAME" or not rows or field in rows[-1]:
-            rows.append({})
-        rows[-1][field] = value
+        elif label in lists:
+            lists[label].append(value)
+        elif label in _MEDICATION:
+            field = _MEDICATION[label]
+            if label == "MEDICATION" or not meds or field in meds[-1]:
+                meds.append({})
+            meds[-1][field] = value
+        else:
+            field = _ROW[label]
+            if label == "TEST_NAME" or not rows or field in rows[-1]:
+                rows.append({})
+            rows[-1][field] = value
     return Extraction(
         patient_name=header.get("patient_name"),
         birth_date=header.get("birth_date"),
         sex=header.get("sex"),
         collection_date=header.get("collection_date"),
         clinician=header.get("clinician"),
+        reason=header.get("reason"),
         results=[
             ExtractedResult(
                 test_name=r.get("test_name", ""),
@@ -141,4 +154,12 @@ def to_extraction(text: str, spans: list[tuple[str, int, int]]) -> Extraction:
             )
             for r in rows
         ],
+        diagnoses=lists["DIAGNOSIS"],
+        medications=[
+            ExtractedMedication(
+                name=m.get("name", ""), dose=m.get("dose"), frequency=m.get("frequency")
+            )
+            for m in meds
+        ],
+        allergies=lists["ALLERGY"],
     )

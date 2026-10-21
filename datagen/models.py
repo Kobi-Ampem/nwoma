@@ -24,6 +24,13 @@ EntityType = Literal[
     "TEST_UNIT",
     "REF_RANGE",
     "FLAG",
+    # Referral letters
+    "REASON",
+    "DIAGNOSIS",
+    "MEDICATION",
+    "DOSE",
+    "FREQUENCY",
+    "ALLERGY",
 ]
 
 
@@ -66,6 +73,7 @@ class ResultRow(BaseModel):
 
 
 class LabReport(BaseModel):
+    doc_type: Literal["lab"] = "lab"
     doc_id: str
     lang: Lang
     template: str
@@ -76,6 +84,44 @@ class LabReport(BaseModel):
     collected_on: Field
     clinician: Field
     results: list[ResultRow]
+
+
+class SourceReferral(BaseModel):
+    """A patient's state at their latest visit, before any language-specific rendering."""
+
+    visit_id: str
+    patient_id: str
+    patient: SourcePatient
+    written_on: date
+    clinician: str
+    organisation: str
+    conditions: list[str]  # SNOMED codes in the referral catalogue, most relevant first
+    medications: list[str]  # Synthea medication descriptions in the catalogue
+    allergies: list[str]  # Synthea allergy descriptions in the catalogue
+
+
+class MedicationRow(BaseModel):
+    name: Field  # value = English generic name
+    dose: Field  # value = dose with a dot decimal, e.g. '2.5 mg'
+    frequency: Field  # value = frequency key, e.g. 'bd'
+
+
+class ReferralLetter(BaseModel):
+    doc_type: Literal["referral"] = "referral"
+    doc_id: str
+    lang: Lang
+    template: str
+    clinic_name: str
+    patient_name: Field
+    birth_date: Field
+    sex: Field
+    clinician: Field  # the referring clinician
+    specialty: str  # who the letter is addressed to; not an extracted field
+    written: str  # the letter's date as printed; not an extracted field
+    reason: Field  # value = the reason as printed
+    diagnoses: list[Field]  # value = ICD-10-CM code
+    medications: list[MedicationRow]
+    allergies: list[Field]  # value = English name
 
 
 class Span(BaseModel):
@@ -100,4 +146,4 @@ class LabeledDoc(BaseModel):
     source_visit: str
     text: str
     spans: list[Span]
-    report: LabReport
+    report: LabReport | ReferralLetter

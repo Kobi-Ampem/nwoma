@@ -17,7 +17,23 @@ from faker import Faker
 from datagen.align import project_spans
 from datagen.compose import compose_report
 from datagen.layouts import LAYOUTS, layouts_for
-from datagen.models import DataSplit, LabeledDoc, Lang, SourceLabVisit
+from datagen.models import (
+    DataSplit,
+    LabeledDoc,
+    LabReport,
+    Lang,
+    ReferralLetter,
+    SourceLabVisit,
+    SourceReferral,
+)
+from datagen.referral import (
+    REFERRAL_LAYOUTS,
+    compose_referral,
+    load_referrals,
+    locate_referral_spans,
+    referral_layouts_for,
+    render_referral,
+)
 from datagen.render import locate_spans, render_pdf
 from datagen.scan import degrade, images_to_pdf
 from datagen.synthea_loader import load_lab_visits
@@ -66,7 +82,7 @@ def split_for(patient_id: str) -> DataSplit:
 
 @dataclass(frozen=True)
 class Job:
-    visit: SourceLabVisit
+    visit: SourceLabVisit | SourceReferral
     split: DataSplit
     layout: str
     scan: bool
@@ -84,10 +100,17 @@ def make_doc(job: Job) -> LabeledDoc:
     _fake.seed_instance(job.seed)
     rng = random.Random(job.seed)
 
-    report = compose_report(job.visit, LAYOUTS[job.layout], rng, _fake)
-    pdf = render_pdf(report)
-    text = pdf_text(pdf)
-    spans = locate_spans(text, report)
+    report: LabReport | ReferralLetter
+    if isinstance(job.visit, SourceReferral):
+        report = compose_referral(job.visit, REFERRAL_LAYOUTS[job.layout], rng, _fake)
+        pdf = render_referral(report)
+        text = pdf_text(pdf)
+        spans = locate_referral_spans(text, report)
+    else:
+        report = compose_report(job.visit, LAYOUTS[job.layout], rng, _fake)
+        pdf = render_pdf(report)
+        text = pdf_text(pdf)
+        spans = locate_spans(text, report)
     lost = 0
     if job.scan:
         pages = [degrade(page, rng) for page in pdf_pages_as_images(pdf, OCR_DPI)]
@@ -120,6 +143,7 @@ def main() -> None:
     parser.add_argument("--scan-share", type=float, default=0.5)
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--per-patient", type=int, default=2)
+    parser.add_argument("--n-referral", type=int, default=0, help="referral letters to add")
     args = parser.parse_args()
 
     rng = random.Random(args.seed)
@@ -137,18 +161,32 @@ def main() -> None:
         scan = rng.random() < args.scan_share
         jobs.append(Job(visit, split, layout.name, scan, rng.randrange(2**32), pdf_dir))
 
+    # Referral letters draw from their own random stream, so adding them leaves every lab
+    # report above exactly as before (and cached extractions of them still apply).
+    ref_rng = random.Random(args.seed + 1)
+    referrals = sorted(load_referrals(args.synthea), key=lambda r: r.patient_id)
+    for source in ref_rng.sample(referrals, min(args.n_referral, len(referrals))):
+        split = split_for(source.patient_id)
+        lang = "fr" if ref_rng.random() < args.fr_share else "en"
+        choices = referral_layouts_for(lang, "heldout" if split == "test_unseen" else "train")
+        ref_layout = ref_rng.choice(choices)
+        scan = ref_rng.random() < args.scan_share
+        jobs.append(Job(source, split, ref_layout.name, scan, ref_rng.randrange(2**32), pdf_dir))
+
     counts: Counter[str] = Counter()
     labels_path = args.out / "labels.jsonl"
     with labels_path.open("w", encoding="utf-8") as out, Pool(args.workers) as pool:
         for doc in pool.imap(make_doc, jobs, chunksize=4):
             out.write(doc.model_dump_json() + "\n")
             counts[doc.split] += 1
+            counts[doc.report.doc_type] += 1
             counts[doc.lang] += 1
             counts[doc.source] += 1
             counts["spans"] += len(doc.spans)
             counts["lost"] += doc.lost_spans
     print(
-        f"documents: en={counts['en']} fr={counts['fr']} "
+        f"documents: lab={counts['lab']} referral={counts['referral']} "
+        f"en={counts['en']} fr={counts['fr']} "
         f"digital={counts['digital']} scan={counts['scan']}\n"
         f"splits: train={counts['train']} dev={counts['dev']} test={counts['test']} "
         f"test_unseen={counts['test_unseen']}\n"

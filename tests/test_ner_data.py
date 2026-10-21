@@ -75,3 +75,15 @@ def test_a_repeated_row_field_starts_a_new_row_without_a_name() -> None:
         "Na 140 138", [("TEST_NAME", 0, 2), ("TEST_VALUE", 3, 6), ("TEST_VALUE", 7, 10)]
     )
     assert [(r.test_name, r.value) for r in ext.results] == [("Na", "140"), ("", "138")]
+
+
+def test_referral_spans_become_lists_and_medication_rows() -> None:
+    text = "Diabetes; Anaemia\nMetformin 500 mg twice\ndaily\nPenicillin"
+    spans = [
+        ("DIAGNOSIS", 0, 8), ("DIAGNOSIS", 10, 17), ("MEDICATION", 18, 27), ("DOSE", 28, 34),
+        ("FREQUENCY", 35, 46), ("ALLERGY", 47, 57),
+    ]  # fmt: skip
+    ext = to_extraction(text, spans)
+    assert ext.diagnoses == ["Diabetes", "Anaemia"] and ext.allergies == ["Penicillin"]
+    med = ext.medications[0]
+    assert (med.name, med.dose, med.frequency) == ("Metformin", "500 mg", "twice daily")

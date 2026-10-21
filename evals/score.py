@@ -11,11 +11,12 @@ Decisions an interviewer may probe:
   that row and does not shift every row after it.
 """
 
+import re
 from collections import Counter
 from collections.abc import Callable
 from difflib import SequenceMatcher
 
-from datagen.models import EntityType, LabeledDoc
+from datagen.models import EntityType, Field, LabeledDoc, LabReport, ReferralLetter
 from extract.schema import ExtractedResult, Extraction
 from normalise.fields import (
     norm_clinician,
@@ -29,6 +30,13 @@ from normalise.fields import (
 
 HEADER: list[EntityType] = ["PATIENT_NAME", "BIRTH_DATE", "SEX", "COLLECTION_DATE", "CLINICIAN"]
 ROW: list[EntityType] = ["TEST_NAME", "TEST_VALUE", "TEST_UNIT", "REF_RANGE", "FLAG"]
+# Referral letters: header fields, medication rows, and lists compared as sets.
+REFERRAL_HEADER: list[EntityType] = ["PATIENT_NAME", "BIRTH_DATE", "SEX", "CLINICIAN", "REASON"]
+MEDICATION_ROW: list[EntityType] = ["MEDICATION", "DOSE", "FREQUENCY"]
+REFERRAL_LISTS: list[EntityType] = ["DIAGNOSIS", "ALLERGY"]
+ALL_LABELS: list[EntityType] = list(
+    dict.fromkeys(HEADER + ROW + REFERRAL_HEADER + MEDICATION_ROW + REFERRAL_LISTS)
+)
 _ROW_MATCH_MIN = 0.6
 # Fields besides the name that identify a row; two of three agreeing (0.67) is a match.
 _ROW_EVIDENCE: list[EntityType] = ["TEST_VALUE", "TEST_UNIT", "REF_RANGE"]
@@ -47,7 +55,9 @@ def _canon(label: EntityType, text: str) -> str:
 
 
 def gold(doc: LabeledDoc) -> tuple[Fields, list[Fields]]:
-    """The truth for every field that survived into the document's text."""
+    """The truth for every field of a lab report that survived into the document's text."""
+    if not isinstance(doc.report, LabReport):
+        raise TypeError("gold() scores lab reports; see _score_referral")
     header: Fields = {}
     rows: list[Fields] = [{} for _ in doc.report.results]
     for span in doc.spans:
@@ -115,20 +125,23 @@ def _compare(truth: Fields, guess: Fields, labels: list[EntityType], counts: Cou
 
 
 def _match_rows(
-    truth: list[Fields], guess: list[Fields], doc: LabeledDoc
+    truth: list[Fields],
+    guess: list[Fields],
+    names: list[str],
+    name_label: EntityType = "TEST_NAME",
+    evidence: list[EntityType] = _ROW_EVIDENCE,
 ) -> list[tuple[int | None, int | None]]:
     """Pair true and predicted rows greedily, by test name similarity or by agreement of the
     row's other fields, whichever is stronger. Short names like 'Cl' misread as 'ct' have no name
     similarity left, but a row whose value, unit and range all agree is still the same row."""
-    names = [r.name.text.casefold() for r in doc.report.results]
 
     def strength(t: Fields, g: Fields, name: str) -> float:
-        by_name = SequenceMatcher(None, name, g.get("TEST_NAME", "").casefold()).ratio()
+        by_name = SequenceMatcher(None, name.casefold(), g.get(name_label, "").casefold()).ratio()
         agree = sum(
             label in t and label in g and _canon(label, t[label]) == _canon(label, g[label])
-            for label in _ROW_EVIDENCE
+            for label in evidence
         )
-        return max(by_name, agree / len(_ROW_EVIDENCE))
+        return max(by_name, agree / len(evidence))
 
     pairs = sorted(
         (
@@ -155,11 +168,14 @@ def _match_rows(
 
 def score_doc(doc: LabeledDoc, ext: Extraction) -> Counter[str]:
     """Counts keyed '<LABEL>/<tp|fp|fn>'."""
+    if isinstance(doc.report, ReferralLetter):
+        return _score_referral(doc, doc.report, ext)
     counts: Counter[str] = Counter()
     true_header, true_rows = gold(doc)
     guess_header, guess_rows = predicted(ext)
     _compare(true_header, guess_header, HEADER, counts)
-    for i, j in _match_rows(true_rows, guess_rows, doc):
+    names = [r.name.text for r in doc.report.results]
+    for i, j in _match_rows(true_rows, guess_rows, names):
         _compare(
             true_rows[i] if i is not None else {},
             guess_rows[j] if j is not None else {},
@@ -171,7 +187,7 @@ def score_doc(doc: LabeledDoc, ext: Extraction) -> Counter[str]:
 
 def prf(counts: Counter[str], labels: list[EntityType] | None = None) -> tuple[float, float, float]:
     """Micro precision, recall and F1 over the given labels (all by default)."""
-    labels = labels or HEADER + ROW
+    labels = labels or ALL_LABELS
     tp = sum(counts[f"{label}/tp"] for label in labels)
     fp = sum(counts[f"{label}/fp"] for label in labels)
     fn = sum(counts[f"{label}/fn"] for label in labels)
@@ -182,3 +198,67 @@ def prf(counts: Counter[str], labels: list[EntityType] | None = None) -> tuple[f
 
 def all_correct(counts: Counter[str]) -> bool:
     return not any(v for k, v in counts.items() if k.endswith(("/fp", "/fn")))
+
+
+def _norm_dose(text: str) -> str:
+    """'2,5 mg' -> '2.5 mg': the stored dose value uses a dot decimal."""
+    return " ".join(re.sub(r"(\d),(\d)", r"\1.\2", text).split())
+
+
+def _score_referral(doc: LabeledDoc, letter: ReferralLetter, ext: Extraction) -> Counter[str]:
+    """Header fields as for lab reports, medication rows matched by name, and diagnoses and
+    allergies compared as sets of printed text (mapping diagnoses to ICD-10 is scored apart)."""
+    counts: Counter[str] = Counter()
+    survived = {(s.label, s.row) for s in doc.spans}
+    truth: Fields = {s.label: s.value for s in doc.spans if s.label in REFERRAL_HEADER}
+    guess_raw: dict[EntityType, str | None] = {
+        "PATIENT_NAME": ext.patient_name,
+        "BIRTH_DATE": ext.birth_date,
+        "SEX": ext.sex,
+        "CLINICIAN": ext.clinician,
+        "REASON": ext.reason,
+    }
+    norms: dict[EntityType, Callable[[str], str]] = {**_HEADER_NORM, "REASON": str.strip}
+    guess: Fields = {label: norms[label](v) for label in REFERRAL_HEADER if (v := guess_raw[label])}
+    _compare(truth, guess, REFERRAL_HEADER, counts)
+
+    true_meds: list[Fields] = []
+    for i, m in enumerate(letter.medications):
+        row: Fields = {}
+        fields: list[tuple[EntityType, str]] = [
+            ("MEDICATION", m.name.text),
+            ("DOSE", m.dose.value),
+            ("FREQUENCY", m.frequency.text),
+        ]
+        for label, value in fields:
+            if (label, i) in survived:
+                row[label] = value
+        true_meds.append(row)
+    guess_meds: list[Fields] = []
+    for gm in ext.medications:
+        row = {"MEDICATION": gm.name} if gm.name else {}
+        if gm.dose:
+            row["DOSE"] = _norm_dose(gm.dose)
+        if gm.frequency:
+            row["FREQUENCY"] = gm.frequency
+        guess_meds.append(row)
+    names = [m.name.text for m in letter.medications]
+    for ti, gi in _match_rows(true_meds, guess_meds, names, "MEDICATION", ["DOSE", "FREQUENCY"]):
+        t = true_meds[ti] if ti is not None else {}
+        g = guess_meds[gi] if gi is not None else {}
+        _compare(t, g, MEDICATION_ROW, counts)
+
+    lists: list[tuple[EntityType, list[Field], list[str]]] = [
+        ("DIAGNOSIS", letter.diagnoses, ext.diagnoses),
+        ("ALLERGY", letter.allergies, ext.allergies),
+    ]
+    for label, printed, guessed in lists:
+        want = Counter(
+            _canon(label, f.text) for i, f in enumerate(printed) if (label, i) in survived
+        )
+        got = Counter(_canon(label, g) for g in guessed if g)
+        tp = sum((want & got).values())
+        counts[f"{label}/tp"] += tp
+        counts[f"{label}/fp"] += sum(got.values()) - tp
+        counts[f"{label}/fn"] += sum(want.values()) - tp
+    return counts

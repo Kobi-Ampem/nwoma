@@ -16,6 +16,7 @@ from google import genai
 from google.genai import errors, types
 from pydantic import ValidationError
 
+from extract.doctype import DocType, detect_doc_type
 from extract.schema import Extraction
 
 PROMPT = """You extract data from a clinical laboratory report, in English or French.
@@ -32,7 +33,31 @@ Rules:
 
 Report text:
 """
-PROMPT_VERSION = hashlib.sha256(PROMPT.encode()).hexdigest()[:8]
+REFERRAL_PROMPT = """You extract data from a clinical referral letter, in English or French.
+The text may come from OCR of a scan, so it can contain misread characters and stray symbols.
+
+Rules:
+- Copy each field exactly as printed: keep the date format and the wording. Do not translate,
+  expand abbreviations or reformat.
+- Only correct a character when OCR has obviously garbled it.
+- clinician is the referring doctor who signs the letter, without the title (no 'Dr').
+- reason is the reason for referral, as printed.
+- diagnoses: one entry per listed diagnosis or past history item.
+- medications: one entry per current medication, with its dose and frequency as printed.
+- allergies: one entry per allergy; leave the list empty if the letter says there are none.
+- Leave lab-report fields (collection_date, results) empty.
+- Use null or an empty list for anything not in the text. Never guess a value.
+
+Letter text:
+"""
+PROMPTS: dict[DocType, str] = {"lab": PROMPT, "referral": REFERRAL_PROMPT}
+
+
+def prompt_version(prompt: str) -> str:
+    return hashlib.sha256(prompt.encode()).hexdigest()[:8]
+
+
+PROMPT_VERSION = prompt_version(PROMPT)
 
 _RETRIES = 5
 # Normal calls take ~10 s. Without a timeout, one stalled connection hangs the run forever.
@@ -66,7 +91,7 @@ class GeminiExtractor:
         thinking_level: str | None = None,
     ) -> None:
         self.model = model
-        self.cache_dir = cache_dir / model / PROMPT_VERSION
+        self.cache_dir = cache_dir / model  # then one folder per prompt version
         # Reads GEMINI_API_KEY.
         self.client = client or genai.Client(http_options=types.HttpOptions(timeout=_TIMEOUT_MS))
         self.min_interval_s = min_interval_s  # spaces calls to stay under requests per minute
@@ -82,9 +107,12 @@ class GeminiExtractor:
         )
         self._last_call = 0.0
 
-    def extract(self, doc_id: str, text: str) -> LLMResult:
+    def extract(self, doc_id: str, text: str, doc_type: DocType | None = None) -> LLMResult:
+        """Each document type has its own prompt and cache folder, so adding a prompt for one
+        type never invalidates the cached answers for another."""
+        prompt = PROMPTS[doc_type or detect_doc_type(text)]
         key = hashlib.sha256(text.encode()).hexdigest()[:12]
-        path = self.cache_dir / f"{doc_id}-{key}.json"
+        path = self.cache_dir / prompt_version(prompt) / f"{doc_id}-{key}.json"
         if path.exists():
             saved = json.loads(path.read_text())
             return LLMResult(
@@ -95,7 +123,7 @@ class GeminiExtractor:
                 cached=True,
                 valid=saved["valid"],
             )
-        result = self._call(text)
+        result = self._call(prompt, text)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(
             json.dumps(
@@ -111,7 +139,7 @@ class GeminiExtractor:
         )
         return result
 
-    def _call(self, text: str) -> LLMResult:
+    def _call(self, prompt: str, text: str) -> LLMResult:
         for attempt in range(_RETRIES):
             wait = self.min_interval_s - (time.monotonic() - self._last_call)
             if wait > 0:
@@ -120,7 +148,7 @@ class GeminiExtractor:
             start = time.perf_counter()
             try:
                 response = self.client.models.generate_content(
-                    model=self.model, contents=PROMPT + text, config=self.config
+                    model=self.model, contents=prompt + text, config=self.config
                 )
             except errors.APIError as e:
                 if e.code == 429 and "day" in str(e).lower():

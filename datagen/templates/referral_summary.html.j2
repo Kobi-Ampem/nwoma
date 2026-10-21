@@ -1,0 +1,15 @@
+{# Held-out skeleton: lists printed inline, separated by semicolons, in a two-column table. #}
+{% extends "referral_base.html.j2" %}
+{% block style %}
+  table.s { border-collapse: collapse; width: 100%; } table.s td { border: 1px solid #555; padding: 1.2mm 2mm; vertical-align: top; }
+  table.s td.k { width: 1%; white-space: nowrap; font-weight: bold; }  /* a wrapped label would interleave with its value in the text */ h2 { display: none; }
+{% endblock %}
+{% block header %}<p><b>{{ letter.clinic_name }}</b> — {{ h.to }} {{ letter.specialty }} — {{ letter.written }}</p>{% endblock %}
+{% block patient %}<table class="s"><tr><td class="k">{{ h.name }}{{ layout.separator }}</td><td>{{ letter.patient_name.text }}</td></tr>
+<tr><td class="k">{{ h.dob }}{{ layout.separator }}</td><td>{{ letter.birth_date.text }}</td></tr>
+<tr><td class="k">{{ h.sex }}{{ layout.separator }}</td><td>{{ letter.sex.text }}</td></tr></table>{% endblock %}
+{% block diagnoses %}<table class="s"><tr><td class="k">{{ h.diagnoses }}</td><td>{% for d in letter.diagnoses %}{{ d.text }}{% if not loop.last %}; {% endif %}{% endfor %}</td></tr></table>{% endblock %}
+{% block allergies %}<table class="s"><tr><td class="k">{{ h.allergies }}</td><td>{% if letter.allergies %}{% for a in letter.allergies %}{{ a.text }}{% if not loop.last %}; {% endif %}{% endfor %}{% else %}{{ h.none }}{% endif %}</td></tr></table>{% endblock %}
+{% block medications %}<table class="s"><tr><td class="k">{{ h.medications }}</td><td>{% for m in letter.medications %}{{ m.name.text }} {{ m.dose.text }} {{ m.frequency.text }}{% if not loop.last %}; {% endif %}{% endfor %}</td></tr></table>{% endblock %}
+{% block reason %}<table class="s"><tr><td class="k">{{ h.reason }}</td><td>{{ letter.reason.text }}</td></tr></table>{% endblock %}
+{% block sign %}<p>{{ h.sign }}{{ layout.separator }}{{ layout.clinician_prefix }}{{ letter.clinician.text }}</p>{% endblock %}

@@ -52,7 +52,8 @@ def project_spans(source: str, spans: list[Span], target: str) -> tuple[list[Spa
             end -= 1
         # A misread field stays about its printed length. A span that grew far longer, or across
         # lines, was stretched over OCR junk by the alignment: its true position is unknown.
-        stretched = end - start > 2 * len(span.text) + 3 or "\n" in target[start:end]
+        new_line = "\n" in target[start:end] and "\n" not in span.text  # a wrapped field may
+        stretched = end - start > 2 * len(span.text) + 3 or new_line  # legitimately span lines
         if start >= end or stretched:
             lost += 1
             continue

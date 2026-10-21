@@ -1,0 +1,12 @@
+{% extends "referral_base.html.j2" %}
+{% block style %}
+  .box { border: 1px solid #111; padding: 2mm 3mm; margin: 2mm 0; }
+  h2 { background: #ddd; padding: 1mm 2mm; }
+  table { border-collapse: collapse; width: 100%; } td { padding: 0.8mm 2mm; border-bottom: 1px solid #bbb; }
+{% endblock %}
+{% block header %}<p><b>{{ letter.clinic_name }}</b> · {{ letter.written }} · {{ h.to }} {{ letter.specialty }}</p>{% endblock %}
+{% block sign %}<div class="box">{{ h.sign }}{{ layout.separator }}{{ layout.clinician_prefix }}{{ letter.clinician.text }}</div>{% endblock %}
+{% block patient %}<div class="box">{{ h.name }}{{ layout.separator }}{{ letter.patient_name.text }}<br>
+{{ h.dob }}{{ layout.separator }}{{ letter.birth_date.text }} &nbsp; {{ h.sex }}{{ layout.separator }}{{ letter.sex.text }}</div>{% endblock %}
+{% block medications %}<h2>{{ h.medications }}</h2>
+<table>{% for m in letter.medications %}<tr><td>{{ m.name.text }}</td><td>{{ m.dose.text }}</td><td>{{ m.frequency.text }}</td></tr>{% endfor %}</table>{% endblock %}

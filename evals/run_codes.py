@@ -14,6 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from datagen.catalogue import BY_CODE
+from datagen.models import LabReport
 from evals.run_llm import sample_docs
 from normalise.embed import Embedder
 from normalise.loinc import LoincMapper
@@ -26,6 +27,8 @@ def queries(labels: Path) -> tuple[Counter[Query], dict[Query, str]]:
     counts: Counter[Query] = Counter()
     gold: dict[Query, str] = {}
     for doc in docs:
+        if not isinstance(doc.report, LabReport):
+            continue  # referral diagnoses are mapped to ICD-10, scored separately
         for row in doc.report.results:
             q = (row.name.text, row.unit.text if row.unit else None, doc.lang)
             counts[q] += 1

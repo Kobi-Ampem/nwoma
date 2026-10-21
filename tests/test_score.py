@@ -1,7 +1,7 @@
 import pytest
 
 from datagen.layouts import LAYOUTS
-from datagen.models import LabeledDoc
+from datagen.models import LabeledDoc, LabReport
 from datagen.render import locate_spans, render_pdf
 from evals.score import all_correct, prf, score_doc
 from extract.schema import ExtractedResult, Extraction
@@ -26,9 +26,15 @@ def _doc(layout: str) -> LabeledDoc:
     )
 
 
+def _lab(doc: LabeledDoc) -> LabReport:
+    assert isinstance(doc.report, LabReport)
+    return doc.report
+
+
 def _oracle(doc: LabeledDoc) -> Extraction:
     """A perfect extraction: every field exactly as printed."""
     r = doc.report
+    assert isinstance(r, LabReport)
     return Extraction(
         patient_name=r.patient_name.text,
         birth_date=r.birth_date.text,
@@ -62,7 +68,7 @@ def test_a_wrong_value_is_both_a_false_positive_and_a_false_negative() -> None:
     ext.results[0].value = "99.9"
     counts = score_doc(doc, ext)
     assert counts["TEST_VALUE/fp"] == 1 and counts["TEST_VALUE/fn"] == 1
-    assert counts["TEST_NAME/tp"] == len(doc.report.results)  # other fields unaffected
+    assert counts["TEST_NAME/tp"] == len(_lab(doc).results)  # other fields unaffected
 
 
 def test_a_skipped_row_costs_only_that_row() -> None:
@@ -71,7 +77,7 @@ def test_a_skipped_row_costs_only_that_row() -> None:
     del ext.results[1]
     counts = score_doc(doc, ext)
     assert counts["TEST_VALUE/fn"] == 1 and counts["TEST_VALUE/fp"] == 0
-    assert counts["TEST_VALUE/tp"] == len(doc.report.results) - 1
+    assert counts["TEST_VALUE/tp"] == len(_lab(doc).results) - 1
 
 
 def test_a_field_ocr_destroyed_is_not_counted_as_missed() -> None:
