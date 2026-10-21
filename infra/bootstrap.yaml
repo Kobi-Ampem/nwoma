@@ -72,6 +72,12 @@ Resources:
                 Effect: Allow
                 Action: ecr:GetAuthorizationToken
                 Resource: "*"
+              # Logged-in pulls of the public Lambda Web Adapter image: anonymous pulls from
+              # GitHub's shared runners are rate-limited (429 Too Many Requests).
+              - Sid: PublicRegistryLogin
+                Effect: Allow
+                Action: [ecr-public:GetAuthorizationToken, sts:GetServiceBearerToken]
+                Resource: "*"
               - Sid: ReadBuildInputs
                 Effect: Allow
                 Action: [s3:GetObject, s3:ListBucket]

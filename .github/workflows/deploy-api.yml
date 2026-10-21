@@ -32,6 +32,10 @@ jobs:
           mkdir -p artifacts
           aws s3 cp "s3://${{ vars.ARTIFACTS_BUCKET }}/nwoma-artifacts.tar.gz" - | tar -xz -C artifacts
       - uses: aws-actions/amazon-ecr-login@v2
+      - name: Log in to ECR Public (anonymous pulls are rate-limited on shared runners)
+        run: |
+          aws ecr-public get-login-password --region us-east-1 \
+            | docker login --username AWS --password-stdin public.ecr.aws
       - name: Build and push the image
         id: image
         run: |
