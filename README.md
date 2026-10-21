@@ -26,3 +26,13 @@ Nwoma is developed on **synthetic data only**. No real patient information is us
 ## Licence
 
 MIT
+
+## Third-party content
+
+This material contains content from LOINC® (http://loinc.org). LOINC is copyright © Regenstrief
+Institute, Inc. and the Logical Observation Identifiers Names and Codes (LOINC) Committee and is
+available at no cost under the license at http://loinc.org/license. LOINC® is a registered
+United States trademark of Regenstrief Institute, Inc.
+
+The LOINC table is not redistributed in this repository. Download it from loinc.org (free
+registration) and unzip it into `data/loinc/`.

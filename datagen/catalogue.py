@@ -36,6 +36,13 @@ class LabTest:
     high: float | None  # US units
     fr_factor: float = 1.0
     alt_codes: tuple[str, ...] = ()  # specimen variants Synthea also emits; same printed test
+    # LOINC code for the French report when its unit measures moles, not mass: a LOINC code
+    # includes the property measured, so creatinine in µmol/L is a different code from mg/dL.
+    loinc_fr: str | None = None
+
+    def code_for(self, lang: str) -> str:
+        """The LOINC code that matches the unit printed in this language."""
+        return self.loinc_fr if lang == "fr" and self.loinc_fr else self.loinc
 
 
 CATALOGUE: tuple[LabTest, ...] = (
@@ -165,6 +172,7 @@ CATALOGUE: tuple[LabTest, ...] = (
         20.0,
         fr_factor=0.357,
         alt_codes=("6299-2",),
+        loinc_fr="22664-7",
     ),
     LabTest(
         "2160-0",
@@ -179,6 +187,7 @@ CATALOGUE: tuple[LabTest, ...] = (
         1.3,
         fr_factor=88.4,
         alt_codes=("38483-4",),
+        loinc_fr="14682-9",
     ),
     LabTest(
         "33914-3",
@@ -219,6 +228,7 @@ CATALOGUE: tuple[LabTest, ...] = (
         10.2,
         fr_factor=0.2495,
         alt_codes=("49765-1",),
+        loinc_fr="2000-8",
     ),
     # Liver
     LabTest(
@@ -259,6 +269,7 @@ CATALOGUE: tuple[LabTest, ...] = (
         0.1,
         1.2,
         fr_factor=17.1,
+        loinc_fr="14631-6",
     ),
     LabTest(
         "6768-6",

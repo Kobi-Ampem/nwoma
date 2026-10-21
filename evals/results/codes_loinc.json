@@ -1,0 +1,37 @@
+{
+  "keyword (BM25 trigrams)": {
+    "rows_top1": 0.035855697316322044,
+    "rows_top5": 0.3456885173779147,
+    "unique_top1": 0.05504587155963303,
+    "unique_top5": 0.3761467889908257,
+    "rows_top1_same_test": 0.16168059832820061
+  },
+  "semantic (E5 embeddings)": {
+    "rows_top1": 0.03629564452265728,
+    "rows_top5": 0.39298284205895295,
+    "unique_top1": 0.05504587155963303,
+    "unique_top5": 0.3944954128440367,
+    "rows_top1_same_test": 0.139463264408271
+  },
+  "hybrid (RRF)": {
+    "rows_top1": 0.03629564452265728,
+    "rows_top5": 0.3565772107347118,
+    "unique_top1": 0.05504587155963303,
+    "unique_top5": 0.3853211009174312,
+    "rows_top1_same_test": 0.15629124505059394
+  },
+  "+ unit and specimen": {
+    "rows_top1": 0.1957765068191817,
+    "rows_top5": 0.655081390233172,
+    "unique_top1": 0.24770642201834864,
+    "unique_top5": 0.7064220183486238,
+    "rows_top1_same_test": 0.5439947206335239
+  },
+  "+ popularity prior": {
+    "rows_top1": 0.5982182138143423,
+    "rows_top5": 0.8098328200615926,
+    "unique_top1": 0.6238532110091743,
+    "unique_top5": 0.8440366972477065,
+    "rows_top1_same_test": 0.7357017157941047
+  }
+}
