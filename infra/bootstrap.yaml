@@ -149,6 +149,17 @@ Resources:
     Properties:
       RepositoryName: nwoma
       ImageTagMutability: MUTABLE
+      # Lambda pulls the image itself; only for the nwoma-api function of this account.
+      RepositoryPolicyText:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: LambdaPullForNwomaApi
+            Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: [ecr:BatchGetImage, ecr:GetDownloadUrlForLayer]
+            Condition:
+              StringLike:
+                aws:sourceArn: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:nwoma-api
       LifecyclePolicy:
         LifecyclePolicyText: >-
           {"rules": [{"rulePriority": 1, "description": "Keep the last 2 images",
