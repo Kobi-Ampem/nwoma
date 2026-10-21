@@ -148,11 +148,14 @@ def train(
     )
 
     # The export records one run of the model, so prove the graph matches PyTorch on what it will
-    # really get: the longest dev document, several windows, padded to one width.
+    # really get: several windows of different lengths, padded to one width. Joining the longest
+    # dev documents guarantees more than one window even in a small rehearsal.
     import onnxruntime as ort
 
-    longest = max(dev_docs, key=lambda d: len(d.text))
-    _, ids, mask = NerExtractor(tokenizer, torch_run).batch(longest.text)
+    longest = sorted(dev_docs, key=lambda d: len(d.text))[-5:]
+    _, ids, mask = NerExtractor(tokenizer, torch_run).batch("\n".join(d.text for d in longest))
+    if ids.shape[0] < 2 or mask.all():
+        raise SystemExit("ONNX check needs several padded windows; got one.")
     with torch.no_grad():
         expected = model(
             input_ids=torch.from_numpy(ids), attention_mask=torch.from_numpy(mask)
