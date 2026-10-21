@@ -5,9 +5,13 @@ Description: >-
   the cost guard (a $1.99 monthly budget whose alarm switches the API off).
 
 Parameters:
-  GitHubRepo:
+  GitHubSubjectPrefix:
     Type: String
-    Default: Kobi-Ampem/nwoma
+    Default: repo:Kobi-Ampem@210767259/nwoma@1427403489
+    Description: >-
+      The repository's OIDC subject prefix, with GitHub's immutable owner and repository IDs
+      (gh api repos/OWNER/REPO/actions/oidc/customization/sub). A renamed or re-created
+      look-alike repository cannot match it.
   CreateOidcProvider:
     Type: String
     AllowedValues: ["true", "false"]
@@ -47,7 +51,7 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: !Sub repo:${GitHubRepo}:ref:refs/heads/main
+                token.actions.githubusercontent.com:sub: !Sub ${GitHubSubjectPrefix}:ref:refs/heads/main
       Policies:
         - PolicyName: deploy-nwoma-only
           PolicyDocument:
