@@ -1,0 +1,82 @@
+"""Nwoma's HTTP API. Stateless: a document is read, answered and forgotten.
+
+    uv run uvicorn api.app:app --port 8000
+
+POST /extract   a PDF or image (max 5 MB) -> fields, issues for review, code suggestions
+POST /fhir      a reviewed extraction -> FHIR R4 Bundle with Provenance
+GET  /samples   synthetic sample documents to try
+GET  /health    liveness, and whether the LLM fallback is on
+"""
+
+import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Annotated, Any
+
+from dotenv import load_dotenv
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+
+from api.fhir import FhirRequest, build_bundle
+from api.service import MAX_BYTES, ExtractResponse, Nwoma, UnsupportedDocument
+
+SAMPLES = Path(__file__).parent / "samples"
+load_dotenv()  # local development; in AWS the settings come from the function's environment
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    app.state.nwoma = Nwoma()  # models load once, at start-up
+    yield
+
+
+app = FastAPI(title="Nwoma", version="1.0.0", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=os.environ.get(
+        "ALLOWED_ORIGINS", "https://kobi-ampem.github.io,http://localhost:5173"
+    ).split(","),
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+
+def _nwoma(request: Request) -> Nwoma:
+    service: Nwoma = request.app.state.nwoma
+    return service
+
+
+@app.get("/health")
+def health(request: Request) -> dict[str, Any]:
+    return {"status": "ok", "llm_enabled": _nwoma(request).llm_enabled}
+
+
+@app.post("/extract")
+async def extract(request: Request, file: Annotated[UploadFile, File()]) -> ExtractResponse:
+    data = await file.read(MAX_BYTES + 1)
+    if len(data) > MAX_BYTES:
+        raise HTTPException(413, "documents are limited to 5 MB")
+    try:
+        return _nwoma(request).extract(data, file.filename or "")
+    except UnsupportedDocument as e:
+        raise HTTPException(415, str(e)) from e
+
+
+@app.post("/fhir")
+def fhir(req: FhirRequest) -> dict[str, Any]:
+    return build_bundle(req)
+
+
+@app.get("/samples")
+def samples() -> list[dict[str, str]]:
+    return [{"name": p.name, "url": f"/samples/{p.name}"} for p in sorted(SAMPLES.glob("*.pdf"))]
+
+
+@app.get("/samples/{name}")
+def sample(name: str) -> FileResponse:
+    path = SAMPLES / name
+    if path.suffix != ".pdf" or path.parent != SAMPLES or not path.is_file():
+        raise HTTPException(404, "no such sample")
+    return FileResponse(path, media_type="application/pdf")
