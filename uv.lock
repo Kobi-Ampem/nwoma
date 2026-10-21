@@ -795,12 +795,9 @@ name = "nwoma"
 version = "0.0.1"
 source = { virtual = "." }
 dependencies = [
-    { name = "faker" },
     { name = "fastapi" },
     { name = "google-genai" },
     { name = "huggingface-hub" },
-    { name = "jinja2" },
-    { name = "mcp" },
     { name = "numpy" },
     { name = "onnxruntime" },
     { name = "pdfplumber" },
@@ -809,32 +806,40 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "python-multipart" },
     { name = "tokenizers" },
+    { name = "transformers" },
     { name = "uvicorn" },
-    { name = "weasyprint" },
 ]
 
 [package.dev-dependencies]
+datagen = [
+    { name = "faker" },
+    { name = "jinja2" },
+    { name = "weasyprint" },
+]
 dev = [
+    { name = "faker" },
     { name = "fhir-resources" },
     { name = "httpx" },
+    { name = "jinja2" },
+    { name = "mcp" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "ruff" },
+    { name = "weasyprint" },
+]
+mcp = [
+    { name = "mcp" },
 ]
 train = [
     { name = "sentencepiece" },
-    { name = "transformers" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "faker", specifier = ">=40.43.0" },
     { name = "fastapi", specifier = ">=0.156.8" },
     { name = "google-genai", specifier = ">=2.31.0" },
     { name = "huggingface-hub", specifier = ">=2.2.0" },
-    { name = "jinja2", specifier = ">=3.1.6" },
-    { name = "mcp", specifier = ">=2.3.0" },
     { name = "numpy", specifier = ">=2.5.4" },
     { name = "onnxruntime", specifier = ">=1.31.0" },
     { name = "pdfplumber", specifier = ">=0.11.10" },
@@ -843,23 +848,30 @@ requires-dist = [
     { name = "python-dotenv", specifier = ">=1.2.4" },
     { name = "python-multipart", specifier = ">=0.0.32" },
     { name = "tokenizers", specifier = ">=0.23.3" },
+    { name = "transformers", specifier = ">=5.20.2" },
     { name = "uvicorn", specifier = ">=0.54.0" },
-    { name = "weasyprint", specifier = ">=70.0" },
 ]
 
 [package.metadata.requires-dev]
+datagen = [
+    { name = "faker", specifier = ">=40.43.0" },
+    { name = "jinja2", specifier = ">=3.1.6" },
+    { name = "weasyprint", specifier = ">=70.0" },
+]
 dev = [
+    { name = "faker", specifier = ">=40.43.0" },
     { name = "fhir-resources", specifier = ">=8.3.0" },
     { name = "httpx", specifier = ">=0.28.1" },
+    { name = "jinja2", specifier = ">=3.1.6" },
+    { name = "mcp", specifier = ">=2.3.0" },
     { name = "mypy", specifier = ">=1.11" },
     { name = "pre-commit", specifier = ">=3.8" },
     { name = "pytest", specifier = ">=8.3" },
     { name = "ruff", specifier = ">=0.6" },
+    { name = "weasyprint", specifier = ">=70.0" },
 ]
-train = [
-    { name = "sentencepiece", specifier = ">=0.2.2" },
-    { name = "transformers", specifier = ">=5.20.2" },
-]
+mcp = [{ name = "mcp", specifier = ">=2.3.0" }]
+train = [{ name = "sentencepiece", specifier = ">=0.2.2" }]
 
 [[package]]
 name = "onnxruntime"

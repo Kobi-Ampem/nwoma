@@ -68,9 +68,10 @@ class Nwoma:
         embed = Embedder().encode
         self.loinc = LoincMapper(loinc_dir, embed, cache_dir / "loinc_names.npy")
         self.icd10 = Icd10Mapper(icd10_file, embed, cache_dir / "icd10_names.npy")
-        # The LLM fallback switches on only when a key is configured (the Free tier has none).
+        # The LLM fallback switches on only when a key is configured (the Free tier has none;
+        # the deployed parameter holds 'none' until a key is set).
         llm = None
-        if os.environ.get("GEMINI_API_KEY"):
+        if os.environ.get("GEMINI_API_KEY", "none").strip() not in ("", "none"):
             model = llm_model or os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
             llm = GeminiExtractor(model, Path(os.environ.get("LLM_CACHE", "/tmp/llm_cache")))
         self.cascade = Cascade(NerExtractor.from_onnx(model_dir), llm)

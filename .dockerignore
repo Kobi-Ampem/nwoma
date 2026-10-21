@@ -1,0 +1,10 @@
+*
+!pyproject.toml
+!uv.lock
+!api/
+!extract/
+!normalise/
+!ocr/
+!datagen/
+!artifacts/
+**/__pycache__

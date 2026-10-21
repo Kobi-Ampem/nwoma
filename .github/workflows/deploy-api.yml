@@ -1,0 +1,52 @@
+name: Deploy API
+
+# Builds the container image and deploys the nwoma-api stack. Needs the bootstrap stack and the
+# repository variables AWS_DEPLOY_ROLE_ARN, ARTIFACTS_BUCKET and ECR_REPOSITORY_URI.
+on:
+  push:
+    branches: [main]
+    paths: [api/**, extract/**, normalise/**, ocr/**, datagen/models.py, infra/template.yaml, Dockerfile, pyproject.toml, uv.lock]
+  workflow_dispatch:
+
+permissions:
+  id-token: write  # short-lived AWS credentials through OIDC; no stored keys
+  contents: read
+
+concurrency: deploy-api
+
+env:
+  AWS_REGION: eu-west-3
+
+jobs:
+  deploy:
+    if: vars.AWS_DEPLOY_ROLE_ARN != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Build inputs from the private bucket
+        run: |
+          mkdir -p artifacts
+          aws s3 cp "s3://${{ vars.ARTIFACTS_BUCKET }}/nwoma-artifacts.tar.gz" - | tar -xz -C artifacts
+      - uses: aws-actions/amazon-ecr-login@v2
+      - name: Build and push the image
+        id: image
+        run: |
+          uri="${{ vars.ECR_REPOSITORY_URI }}:${{ github.sha }}"
+          docker build -t "$uri" .
+          docker push "$uri"
+          echo "uri=$uri" >> "$GITHUB_OUTPUT"
+      - uses: aws-actions/setup-sam@v3
+        with:
+          use-installer: true
+      - name: Deploy
+        run: |
+          sam deploy --template-file infra/template.yaml --stack-name nwoma-api \
+            --region "$AWS_REGION" --capabilities CAPABILITY_IAM \
+            --parameter-overrides ImageUri=${{ steps.image.outputs.uri }} ReservedConcurrency=${{ vars.RESERVED_CONCURRENCY || '1' }} \
+            --tags project=nwoma --no-confirm-changeset --no-fail-on-empty-changeset
+          aws cloudformation describe-stacks --stack-name nwoma-api \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text

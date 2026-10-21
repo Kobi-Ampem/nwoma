@@ -1,0 +1,58 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >-
+  Nwoma API: one Lambda container behind a function URL. Deployed by GitHub Actions on every
+  push to main. Stateless: nothing is stored.
+
+Parameters:
+  ImageUri:
+    Type: String
+  AllowedOrigins:
+    Type: String
+    Default: https://kobi-ampem.github.io
+  ReservedConcurrency:
+    Type: String
+    Default: "1"
+    Description: >-
+      One request at a time, as a throttle. "none" if the account's total Lambda limit is 10,
+      where AWS refuses any reservation. The budget kill switch works either way.
+
+Conditions:
+  Reserve: !Not [!Equals [!Ref ReservedConcurrency, "none"]]
+
+Resources:
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: nwoma-api
+      PackageType: Image
+      ImageUri: !Ref ImageUri
+      Architectures: [x86_64]
+      MemorySize: 3584  # peak 2.85 GB measured locally (models + code indexes)
+      Timeout: 60
+      # The throttle. The budget alarm sets it to 0: the kill switch.
+      ReservedConcurrentExecutions: !If [Reserve, !Ref ReservedConcurrency, !Ref AWS::NoValue]
+      Environment:
+        Variables:
+          GEMINI_API_KEY: "{{resolve:ssm:/nwoma/gemini-api-key}}"
+          GEMINI_MODEL: gemini-3.5-flash-lite
+          ALLOWED_ORIGINS: !Ref AllowedOrigins
+      FunctionUrlConfig:
+        AuthType: NONE  # a public demo; CORS is enforced by the app for the review UI
+      LoggingConfig:
+        LogGroup: !Ref ApiLogs
+      Tags:
+        project: nwoma
+
+  ApiLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/lambda/nwoma-api
+      RetentionInDays: 7
+      Tags:
+        - {Key: project, Value: nwoma}
+
+Outputs:
+  ApiUrl:
+    Description: The review UI's VITE_API_URL
+    Value: !GetAtt ApiFunctionUrl.FunctionUrl

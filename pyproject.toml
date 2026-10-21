@@ -7,12 +7,9 @@ license = "MIT"
 authors = [{ name = "Kobi Ampem Afriyie" }]
 requires-python = ">=3.12,<3.13"
 dependencies = [
-    "faker>=40.43.0",
     "fastapi>=0.156.8",
     "google-genai>=2.31.0",
     "huggingface-hub>=2.2.0",
-    "jinja2>=3.1.6",
-    "mcp>=2.3.0",
     "numpy>=2.5.4",
     "onnxruntime>=1.31.0",
     "pdfplumber>=0.11.10",
@@ -21,12 +18,21 @@ dependencies = [
     "python-dotenv>=1.2.4",
     "python-multipart>=0.0.32",
     "tokenizers>=0.23.3",
+    "transformers>=5.20.2",  # the NER tokenizer at runtime (no PyTorch needed)
     "uvicorn>=0.54.0",
-    "weasyprint>=70.0",
 ]
 
 [dependency-groups]
+# Only what the API runs is in the main dependencies, so the deployed image stays small.
+datagen = [
+    "faker>=40.43.0",
+    "jinja2>=3.1.6",
+    "weasyprint>=70.0",
+]
+mcp = ["mcp>=2.3.0"]
 dev = [
+    { include-group = "datagen" },
+    { include-group = "mcp" },
     "fhir-resources>=8.3.0",
     "httpx>=0.28.1",
     "mypy>=1.11",
@@ -34,10 +40,7 @@ dev = [
     "pytest>=8.3",
     "ruff>=0.6",
 ]
-train = [
-    "sentencepiece>=0.2.2",
-    "transformers>=5.20.2",
-]
+train = ["sentencepiece>=0.2.2"]
 
 [tool.uv]
 package = false
