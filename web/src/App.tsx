@@ -29,6 +29,7 @@ export default function App() {
   const [active, setActive] = useState<string | null>(null)
   const [fileUrl, setFileUrl] = useState<string | null>(null)
   const [view, setView] = useState<'text' | 'pdf'>('text')
+  const [slow, setSlow] = useState(false) // the server sleeps when idle; waking it takes a while
 
   useEffect(() => {
     listSamples().then(setSampleList).catch(() => setSampleList([]))
@@ -40,6 +41,8 @@ export default function App() {
 
   async function run(file: Blob, name: string) {
     setBusy(true)
+    setSlow(false)
+    const timer = window.setTimeout(() => setSlow(true), 5000)
     setError(null)
     if (fileUrl) URL.revokeObjectURL(fileUrl)
     setFileUrl(URL.createObjectURL(file))
@@ -53,6 +56,7 @@ export default function App() {
       setError(e instanceof Error ? e.message : String(e))
       setResponse(null)
     } finally {
+      window.clearTimeout(timer)
       setBusy(false)
     }
   }
@@ -124,7 +128,13 @@ export default function App() {
             accept="application/pdf,image/*"
             onChange={(e) => e.target.files?.[0] && run(e.target.files[0], e.target.files[0].name)}
           />
-          <span>{busy ? 'Reading the document…' : 'Choose a PDF or image (5 MB max)'}</span>
+          <span>
+            {busy
+              ? slow
+                ? 'Waking the server up: the first request after a quiet spell can take about a minute…'
+                : 'Reading the document…'
+              : 'Choose a PDF or image (5 MB max)'}
+          </span>
         </label>
         {sampleList.length > 0 && (
           <div className="samples">

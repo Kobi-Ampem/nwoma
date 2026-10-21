@@ -29,7 +29,7 @@ Resources:
       ImageUri: !Ref ImageUri
       Architectures: [x86_64]
       MemorySize: 3008  # the account maximum; peak 2.85 GB measured locally
-      Timeout: 60
+      Timeout: 120  # a cold start loads ~1 GB of models: slow, never a failure
       # The throttle. The budget alarm sets it to 0: the kill switch.
       ReservedConcurrentExecutions: !If [Reserve, !Ref ReservedConcurrency, !Ref AWS::NoValue]
       Environment:
