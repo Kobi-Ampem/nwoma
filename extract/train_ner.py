@@ -171,12 +171,17 @@ def train(
     # Shape inference and graph clean-up first, as onnxruntime recommends for int8.
     from onnxruntime.quantization.shape_inference import quant_pre_process
 
+    print(
+        "int8: pre-processing the graph (several minutes on Colab's CPU, no output)...", flush=True
+    )
     quant_pre_process(str(out / "model.onnx"), str(out / "model.prep.onnx"))
+    print("int8: quantising weights...", flush=True)
     quantize_dynamic(out / "model.prep.onnx", out / "model.int8.onnx", weight_type=QuantType.QInt8)
     tokenizer.save_pretrained(out)
     sizes = {f: (out / f).stat().st_size / 1e6 for f in ("model.onnx", "model.int8.onnx")}
     report["size_mb"] = sizes
 
+    print(f"scoring {len(dev_docs)} dev documents with the int8 model on CPU...", flush=True)
     report["dev_onnx_int8"] = evaluate(NerExtractor.from_onnx(out), dev_docs)
     print("dev, int8 ONNX:", json.dumps(report["dev_onnx_int8"], indent=1))
     (out / "train_report.json").write_text(json.dumps(report, indent=2) + "\n")
