@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 from datagen.layouts import LAYOUTS
 from datagen.models import LabeledDoc
 from datagen.referral import REFERRAL_LAYOUTS
-from evals.score import HEADER, ROW, all_correct, prf, score_doc
+from evals.score import ALL_LABELS, all_correct, prf, score_doc
 from extract.llm import GeminiExtractor, LLMResult, QuotaExhausted
 
 
@@ -69,6 +69,7 @@ def report(
         skeleton = f"skeleton={layout.skeleton}"
         for key in (
             "all",
+            f"type={doc.report.doc_type}",
             f"split={doc.split}",
             f"lang={doc.lang}",
             f"source={doc.source}",
@@ -86,7 +87,8 @@ def report(
         "schema_failures": sum(not r.valid for r in done),
         "by_label": {
             label: dict(zip(("precision", "recall", "f1"), prf(total, [label]), strict=True))
-            for label in HEADER + ROW
+            for label in ALL_LABELS
+            if any(total[f"{label}/{kind}"] for kind in ("tp", "fp", "fn"))
         },
         "slices": {k: _slice_report(slices[k], slice_correct[k], slice_n[k]) for k in slices},
         "latency_s": {
