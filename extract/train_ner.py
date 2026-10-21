@@ -146,7 +146,30 @@ def train(
         opset_version=17,
         dynamo=False,
     )
-    quantize_dynamic(out / "model.onnx", out / "model.int8.onnx", weight_type=QuantType.QInt8)
+
+    # The export records one run of the model, so prove the graph matches PyTorch on what it will
+    # really get: the longest dev document, several windows, padded to one width.
+    import onnxruntime as ort
+
+    longest = max(dev_docs, key=lambda d: len(d.text))
+    _, ids, mask = NerExtractor(tokenizer, torch_run).batch(longest.text)
+    with torch.no_grad():
+        expected = model(
+            input_ids=torch.from_numpy(ids), attention_mask=torch.from_numpy(mask)
+        ).logits.numpy()
+    session = ort.InferenceSession(str(out / "model.onnx"))
+    got = session.run(["logits"], {"input_ids": ids, "attention_mask": mask})[0]
+    diff = float(abs(expected - got)[mask == 1].max())
+    report["onnx_check"] = {"windows": int(ids.shape[0]), "max_abs_logit_diff": diff}
+    print(f"ONNX vs PyTorch on {ids.shape[0]} padded windows: max logit difference {diff:.2e}")
+    if diff > 1e-3:
+        raise SystemExit("The ONNX export does not match PyTorch; not quantising it.")
+
+    # Shape inference and graph clean-up first, as onnxruntime recommends for int8.
+    from onnxruntime.quantization.shape_inference import quant_pre_process
+
+    quant_pre_process(str(out / "model.onnx"), str(out / "model.prep.onnx"))
+    quantize_dynamic(out / "model.prep.onnx", out / "model.int8.onnx", weight_type=QuantType.QInt8)
     tokenizer.save_pretrained(out)
     sizes = {f: (out / f).stat().st_size / 1e6 for f in ("model.onnx", "model.int8.onnx")}
     report["size_mb"] = sizes

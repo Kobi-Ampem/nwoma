@@ -24,12 +24,17 @@ class NerExtractor:
         self.tokenizer = tokenizer
         self.run = run
 
-    def spans(self, text: str) -> list[tuple[str, int, int]]:
+    def batch(self, text: str) -> tuple[Any, npt.NDArray[np.int64], npt.NDArray[np.int64]]:
+        """The document's windows, padded to one width: (encoding, input ids, attention mask)."""
         enc = windows(self.tokenizer, text)
         width = max(len(ids) for ids in enc["input_ids"])
         pad = self.tokenizer.pad_token_id
         ids = np.array([i + [pad] * (width - len(i)) for i in enc["input_ids"]], dtype=np.int64)
         mask = np.array([m + [0] * (width - len(m)) for m in enc["attention_mask"]], dtype=np.int64)
+        return enc, ids, mask
+
+    def spans(self, text: str) -> list[tuple[str, int, int]]:
+        enc, ids, mask = self.batch(text)
         logits = self.run(ids, mask)
         summed: dict[tuple[int, int], npt.NDArray[np.float32]] = {}
         for w, offsets in enumerate(enc["offset_mapping"]):
