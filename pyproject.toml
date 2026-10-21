@@ -11,6 +11,7 @@ dependencies = [
     "google-genai>=2.31.0",
     "jinja2>=3.1.6",
     "numpy>=2.5.4",
+    "onnxruntime>=1.31.0",
     "pdfplumber>=0.11.10",
     "pillow>=13.0.0",
     "pydantic>=2.8",
@@ -24,6 +25,10 @@ dev = [
     "pre-commit>=3.8",
     "pytest>=8.3",
     "ruff>=0.6",
+]
+train = [
+    "sentencepiece>=0.2.2",
+    "transformers>=5.20.2",
 ]
 
 [tool.uv]
@@ -42,7 +47,7 @@ strict = true
 exclude = ["^web/", "^infra/"]
 
 [[tool.mypy.overrides]]
-module = ["weasyprint"]  # ships no type information
+module = ["weasyprint", "torch", "onnxruntime", "onnxruntime.*"]  # no types, or Colab-only
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

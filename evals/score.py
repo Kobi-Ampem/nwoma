@@ -88,7 +88,11 @@ def predicted(ext: Extraction) -> tuple[Fields, list[Fields]]:
 
 
 def _row(r: ExtractedResult) -> Fields:
-    row: Fields = {"TEST_NAME": r.test_name, "TEST_VALUE": norm_number(r.value)}
+    row: Fields = {}
+    if r.test_name:  # an empty string means "not found", not a wrong answer
+        row["TEST_NAME"] = r.test_name
+    if r.value:
+        row["TEST_VALUE"] = norm_number(r.value)
     if r.unit:
         row["TEST_UNIT"] = r.unit
     if r.ref_range:
