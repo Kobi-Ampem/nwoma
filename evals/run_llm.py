@@ -17,6 +17,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from datagen.layouts import LAYOUTS
 from datagen.models import LabeledDoc
 from evals.score import HEADER, ROW, all_correct, prf, score_doc
 from extract.llm import GeminiExtractor, LLMResult, QuotaExhausted
@@ -54,7 +55,15 @@ def report(
             continue
         counts = score_doc(doc, results[doc.doc_id].extraction)
         total += counts
-        for key in ("all", f"split={doc.split}", f"lang={doc.lang}", f"source={doc.source}"):
+        # Skeleton separates the fresh held-out layouts (ledger) from ones already examined (list).
+        skeleton = f"skeleton={LAYOUTS[doc.template].skeleton}"
+        for key in (
+            "all",
+            f"split={doc.split}",
+            f"lang={doc.lang}",
+            f"source={doc.source}",
+            skeleton,
+        ):
             slices[key] += counts
             slice_n[key] += 1
             slice_correct[key] += all_correct(counts)

@@ -1,7 +1,9 @@
-"""The 12 document layouts: 4 HTML skeletons, each layout varying wording, order and formats.
+"""The 18 document layouts: 5 HTML skeletons, each layout varying wording, order and formats.
 
-Layouts marked `heldout` use the `list` skeleton, which no training layout uses, so the
-unseen-layout test set measures generalisation to a new structure, not just new wording.
+Layouts marked `heldout` use the `list` and `ledger` skeletons, which no training layout uses, so
+the unseen-layout test set measures generalisation to a new structure, not just new wording.
+`ledger` was added after v1's results on `list` had been examined (issue #17), so it is the
+clean measure for anything trained after that.
 """
 
 from dataclasses import dataclass
@@ -123,6 +125,33 @@ LAYOUTS: dict[str, Layout] = {
             flag_style="arrow",
             font='"DejaVu Sans Mono", monospace',
         ),
+        # English, training layouts added for v2 (issue #17): flag position, brackets, styles.
+        Layout(
+            "lab_en_07",
+            "en",
+            "table",
+            "train",
+            "Laboratory results",
+            _labels("Patient name", "DOB", "Sex", "Specimen collected", "Ordering physician"),
+            _EN_HEAD,
+            columns=("name", "value", "unit", "flag", "ref"),
+            name_style="family_upper_given",
+            ref_brackets=True,
+        ),
+        Layout(
+            "lab_en_08",
+            "en",
+            "sidebar",
+            "train",
+            "Biochemistry report",
+            _labels("Name", "Date of birth", "Gender", "Received", "Doctor"),
+            {**_EN_HEAD, "ref": "Ref. interval"},
+            date_style="iso",
+            sex_style="letter",
+            flag_style="arrow",
+            ref_brackets=True,
+            font='"DejaVu Serif", serif',
+        ),
         # English, held out
         Layout(
             "lab_en_05",
@@ -202,6 +231,33 @@ LAYOUTS: dict[str, Layout] = {
             flag_style="arrow",
             font='"DejaVu Sans Mono", monospace',
         ),
+        # French, training layouts added for v2 (issue #17).
+        Layout(
+            "lab_fr_07",
+            "fr",
+            "boxed",
+            "train",
+            "Résultats d'examens biologiques",
+            _labels("Patient", "Date de naissance", "Sexe", "Prélèvement", "Prescrit par"),
+            _FR_HEAD,
+            columns=("name", "value", "unit", "flag", "ref"),
+            date_style="d_mon_y",
+            flag_style="word",
+            ref_brackets=True,
+        ),
+        Layout(
+            "lab_fr_08",
+            "fr",
+            "table",
+            "train",
+            "Compte rendu de laboratoire",
+            _labels("Nom", "Né(e) le", "Sexe", "Date de prélèvement", "Médecin"),
+            {**_FR_HEAD, "ref": "Intervalle de référence"},
+            columns=("name", "value", "unit", "flag", "ref"),
+            name_style="family_comma_given",
+            flag_style="arrow",
+            font='"DejaVu Sans Mono", monospace',
+        ),
         # French, held out
         Layout(
             "lab_fr_05",
@@ -227,6 +283,36 @@ LAYOUTS: dict[str, Layout] = {
             date_style="iso",
             flag_style="word",
             ref_brackets=True,
+        ),
+        # Held out, added for v2 (issue #17): the fresh generalisation test. New skeleton, and
+        # the flag before the value, a position no other layout uses.
+        Layout(
+            "lab_en_09",
+            "en",
+            "ledger",
+            "heldout",
+            "Patient laboratory record",
+            _labels("Patient", "Born", "Sex", "Collected on", "Authorised by"),
+            _EN_HEAD,
+            columns=("name", "flag", "value", "unit", "ref"),
+            date_style="d_mon_y",
+            name_style="family_comma_given",
+            sex_style="letter",
+            flag_style="word",
+            font='"DejaVu Serif", serif',
+        ),
+        Layout(
+            "lab_fr_09",
+            "fr",
+            "ledger",
+            "heldout",
+            "Dossier biologique",
+            _labels("Patient(e)", "Né(e) le", "Sexe", "Prélevé le", "Validé par"),
+            _FR_HEAD,
+            columns=("name", "ref", "value", "unit", "flag"),
+            name_style="family_upper_given",
+            flag_style="word",
+            font='"DejaVu Sans Mono", monospace',
         ),
     )
 }

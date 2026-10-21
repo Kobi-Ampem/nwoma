@@ -1,0 +1,32 @@
+{# Held-out skeleton added for v2 (issue #17): no results were looked at before it was written.
+   New structure: patient strip on one line, no column headings, collection date and clinician
+   signed off after the results. #}
+{% extends "base.html.j2" %}
+{% from "_macros.html.j2" import field with context %}
+{% block style %}
+  .lab { font-size: 12pt; font-weight: bold; letter-spacing: 0.5pt; }
+  .strip { border-top: 3px double #111; border-bottom: 3px double #111; padding: 1.5mm 0; margin: 2mm 0 3mm 0; }
+  .panel td { text-transform: uppercase; font-size: 8.5pt; letter-spacing: 0.5pt; }
+  .sign { margin-top: 6mm; text-align: right; }
+{% endblock %}
+{% block header %}
+<div class="lab">{{ report.lab_name }} · {{ layout.title }}</div>
+<div class="strip">
+  {{ field("PATIENT_NAME", report.patient_name) }} &nbsp;·&nbsp;
+  {{ field("BIRTH_DATE", report.birth_date) }} &nbsp;·&nbsp; {{ field("SEX", report.sex) }}
+</div>
+{% endblock %}
+{% block results %}
+<table class="results">
+  {% for title, rows in groups %}
+  <tr class="panel"><td colspan="{{ layout.columns | length }}">{{ title }}</td></tr>
+  {% for cells in rows %}
+  <tr>{% for col, text in cells %}<td class="{{ col }}">{{ text }}</td>{% endfor %}</tr>
+  {% endfor %}
+  {% endfor %}
+</table>
+<div class="sign">
+  {{ field("COLLECTION_DATE", report.collected_on) }}<br>
+  {{ field("CLINICIAN", report.clinician, layout.clinician_prefix) }}
+</div>
+{% endblock %}

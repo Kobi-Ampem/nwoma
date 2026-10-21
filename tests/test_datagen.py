@@ -61,7 +61,7 @@ def test_heldout_layouts_use_a_skeleton_training_never_sees() -> None:
     for lang in ("en", "fr"):
         train = layouts_for(lang, "train")
         heldout = layouts_for(lang, "heldout")
-        assert len(train) == 4 and len(heldout) == 2
+        assert len(train) == 6 and len(heldout) == 3
         assert {lay.skeleton for lay in heldout}.isdisjoint({lay.skeleton for lay in train})
 
 
