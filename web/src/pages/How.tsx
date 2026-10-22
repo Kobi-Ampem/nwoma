@@ -19,6 +19,13 @@ export function How() {
         200 referral letters, half scanned, half in French, including layouts no model had seen.
       </p>
 
+      <div className="stat-tiles">
+        <div className="card stat"><b>{HEADLINE.cascadeF1}</b><span>field accuracy (F1) on 500 held-out documents</span></div>
+        <div className="card stat"><b>{HEADLINE.fullyCorrect}</b><span>of documents with every field right</span></div>
+        <div className="card stat"><b>{HEADLINE.toLlm}</b><span>sent to the LLM; the rest stay on the local model</span></div>
+        <div className="card stat"><b>{HEADLINE.costPerMonth}</b><span>a month to run this demo on AWS</span></div>
+      </div>
+
       <div className="section-title"><h2>The pipeline</h2></div>
       <div className="pipeline">
         {STEPS.map((s) => (

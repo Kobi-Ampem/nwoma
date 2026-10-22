@@ -12,7 +12,7 @@ export function Summary({ session, reviewer }: { session: Session; reviewer: str
   return (
     <article className="card card-pad summary-sheet">
       <div className="no-print" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginBottom: 12 }}>
-        <a className="btn btn-ghost" href="#/export">
+        <a className="btn btn-ghost" href="#/review">
           ← Back
         </a>
         <button className="btn btn-primary" onClick={() => window.print()}>

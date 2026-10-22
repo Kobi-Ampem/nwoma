@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { type CodeSuggestion, suggestCodes } from '../api'
 import { DocumentViewer } from '../components/DocumentViewer'
-import { Stepper } from '../components/Stepper'
+import { ExportPanel } from '../components/ExportPanel'
 import { HEADER_FIELDS, allPaths, codeKeyAffectedBy, fieldRows, itemPaths, setField } from '../review'
 import type { Session } from '../session'
 
@@ -40,7 +40,8 @@ function CodeSelect(props: {
   )
 }
 
-export function Review({ session, update }: { session: Session; update: Update }) {
+export function Review(props: { session: Session; update: Update; reviewer: string; setReviewer: (name: string) => void }) {
+  const { session, update } = props
   const { response, ext, confirmed, codes, suggestions } = session
   const [active, setActive] = useState<string | null>(null)
   const timers = useRef<Record<string, number>>({})
@@ -124,7 +125,6 @@ export function Review({ session, update }: { session: Session; update: Update }
 
   return (
     <>
-      <Stepper at={2} />
       <div className="review-head">
         <div>
           <h1>{response.doc_type === 'lab' ? 'Lab report' : 'Referral letter'}</h1>
@@ -392,10 +392,11 @@ export function Review({ session, update }: { session: Session; update: Update }
             <button className="btn btn-sm" onClick={confirmUnflagged}>
               Confirm all unflagged
             </button>
-            <a className="btn btn-primary" href="#/export">
-              Continue to export →
-            </a>
+            <button className="btn btn-primary" onClick={() => document.getElementById('export')?.scrollIntoView({ behavior: 'smooth' })}>
+              Export ↓
+            </button>
           </div>
+          <ExportPanel session={session} reviewer={props.reviewer} setReviewer={props.setReviewer} />
         </div>
       </div>
     </>

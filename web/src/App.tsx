@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
 import { API_URL, explain, extract, sampleFile, samples as listSamples } from './api'
-import { Export } from './pages/Export'
 import { Home } from './pages/Home'
 import { How } from './pages/How'
 import { Review } from './pages/Review'
 import { Summary } from './pages/Summary'
 import { type Session, startSession } from './session'
 
-type Route = '' | 'review' | 'export' | 'summary' | 'how'
+type Route = '' | 'review' | 'summary' | 'how'
 
 function useRoute(): Route {
   const read = () => (window.location.hash.replace(/^#\/?/, '').split('?')[0] as Route) || ''
@@ -65,7 +64,7 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once, on load
   }, [])
 
-  const needsDoc = (route === 'review' || route === 'export' || route === 'summary') && !session
+  const needsDoc = (route === 'review' || route === 'summary') && !session
   const page = needsDoc || route === '' ? 'home' : route
   const update = (change: (s: Session) => Session) => setSession((s) => (s ? change(s) : s))
 
@@ -79,20 +78,19 @@ export default function App() {
           </a>
           <nav className="nav">
             <a className={page === 'home' ? 'on' : ''} href="#/">Home</a>
-            {session && <a className={page === 'review' || page === 'export' || page === 'summary' ? 'on' : ''} href="#/review">Review</a>}
+            {session && <a className={page === 'review' || page === 'summary' ? 'on' : ''} href="#/review">Review</a>}
             <a className={page === 'how' ? 'on' : ''} href="#/how">How it works</a>
           </nav>
         </div>
       </header>
       <main className="page">
         {page === 'home' && <Home samples={sampleList} busy={busy} slow={slow} error={error} onFile={run} onSample={runSample} />}
-        {page === 'review' && session && <Review session={session} update={update} />}
-        {page === 'export' && session && <Export session={session} reviewer={reviewer} setReviewer={setReviewer} />}
+        {page === 'review' && session && <Review session={session} update={update} reviewer={reviewer} setReviewer={setReviewer} />}
         {page === 'summary' && session && <Summary session={session} reviewer={reviewer} />}
         {page === 'how' && <How />}
       </main>
       <footer className="footer">
-        <span>Synthetic data only · transcription, not diagnosis</span>
+        <span>Transcription, not diagnosis</span>
         <a href="https://github.com/Kobi-Ampem/nwoma">GitHub</a>
         <span>API {API_URL.replace(/^https?:\/\//, '').slice(0, 32)}…</span>
       </footer>
