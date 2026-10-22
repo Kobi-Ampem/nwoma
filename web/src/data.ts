@@ -20,6 +20,8 @@ export const CODING = [
   { task: 'Lab test → LOINC', top1: '59.8%', top5: '81.0%', note: 'same test, any method: 73.6%' },
   { task: 'Diagnosis → ICD-10-CM (English)', top1: '43.6%', top5: '76.4%', note: 'with official coding rules' },
   { task: 'Diagnosis → ICD-10-CM (French)', top1: '44.2%', top5: '65.1%', note: 'no French code table used' },
+  { task: 'Coding agent, lab tests → LOINC', top1: '85.2%', top5: '—', note: 'Gemini with tools, 40 documents' },
+  { task: 'Coding agent, diagnoses → ICD-10-CM', top1: '93.0%', top5: '—', note: '~3.5 model calls per document' },
 ]
 
 export interface SampleInfo {

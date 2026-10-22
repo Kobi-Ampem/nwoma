@@ -1,5 +1,19 @@
 {
-  "docs": 0,
-  "mean_steps": 0,
-  "mean_tokens": 0
+  "docs": 40,
+  "mean_steps": 3.475,
+  "mean_tokens": 7462.8,
+  "loinc": {
+    "mapper": 0.6419213973799127,
+    "agent": 0.851528384279476,
+    "mapper_close": 0.759825327510917,
+    "agent_close": 0.9694323144104804,
+    "items": 229
+  },
+  "icd10": {
+    "mapper": 0.49122807017543857,
+    "agent": 0.9298245614035088,
+    "mapper_close": 0.631578947368421,
+    "agent_close": 0.9649122807017544,
+    "items": 57
+  }
 }

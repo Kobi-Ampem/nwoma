@@ -28,6 +28,7 @@ French, half scanned, including layouts no model trained on). Full report:
 |---|---|---|
 | Lab test → LOINC | 59.8% | 81.0% |
 | Diagnosis → ICD-10-CM (English / French) | 43.6% / 44.2% | 76.4% / 65.1% |
+| With the coding agent (LOINC / ICD-10-CM, 40 documents) | 85.2% / 93.0% | |
 
 The cascade matches the LLM's accuracy with a third of the calls, and gets more documents fully
 right than either extractor alone. Code suggestions are right first time about half the time,
@@ -59,8 +60,9 @@ flowchart LR
 6. **Review and export.** The reviewer sees the original beside the fields, confirms or corrects
    them, chooses codes, and downloads FHIR R4 (for systems) or a readable summary (for people).
 
-An **agent** (Gemini with four tools, at most five steps) can assign codes where search alone
-fails, such as French abbreviations; an **MCP server** offers extraction, coding and FHIR export
+An **agent** (Gemini with four tools, at most five steps) assigns codes where search alone fails,
+such as French abbreviations: top-1 rises from 64% to 85% for LOINC and from 49% to 93% for
+ICD-10-CM, at about 3.5 model calls per document. An **MCP server** offers extraction, coding and FHIR export
 to AI assistants.
 
 ## Who it is for
