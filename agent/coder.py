@@ -22,7 +22,7 @@ from google import genai
 from google.genai import errors, types
 
 from extract.llm import QuotaExhausted
-from normalise.fields import norm_number, norm_range
+from normalise.fields import parse_number, parse_range
 from normalise.icd10 import Icd10Mapper
 from normalise.loinc import LoincMapper
 
@@ -147,16 +147,14 @@ class CodingAgent:
             ]
 
         def check_range(value: str, ref_range: str) -> str:
-            low, _, high = norm_range(ref_range).partition("-")
-            try:
-                v = float(norm_number(value))
-                if high and v > float(high):
-                    return "high"
-                if low and v < float(low):
-                    return "low"
-                return "normal"
-            except ValueError:
+            v, bounds = parse_number(value), parse_range(ref_range)
+            if v is None or bounds is None:
                 return "unreadable"
+            if bounds[1] is not None and v > bounds[1]:
+                return "high"
+            if bounds[0] is not None and v < bounds[0]:
+                return "low"
+            return "normal"
 
         def read_document(words: str) -> list[str]:
             wanted = [w.casefold() for w in words.split() if len(w) > 1]

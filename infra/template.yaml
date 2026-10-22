@@ -7,6 +7,10 @@ Description: >-
 Parameters:
   ImageUri:
     Type: String
+  ExecutionRoleName:
+    Type: String
+    Default: nwoma-api-execution
+    Description: Created by the bootstrap stack; this stack never creates IAM roles.
   AllowedOrigins:
     Type: String
     Default: https://kobi-ampem.github.io
@@ -26,6 +30,7 @@ Resources:
     Properties:
       FunctionName: nwoma-api
       PackageType: Image
+      Role: !Sub arn:aws:iam::${AWS::AccountId}:role/${ExecutionRoleName}
       ImageUri: !Ref ImageUri
       Architectures: [x86_64]
       MemorySize: 3008  # the account maximum; peak 2.85 GB measured locally

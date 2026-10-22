@@ -4,11 +4,12 @@ confirmed.
 Values are normalised on the way (ISO dates, dot decimals, H/L interpretation codes). Every
 resource gets a stable urn:uuid derived from the document, so the same input gives the same
 Bundle. Two Provenance records: one says Nwoma assembled every resource; the other, only when a
-reviewer confirmed something, names the resources whose fields were all confirmed.
+reviewer confirmed something, names the resources whose fields, and chosen code, were all
+confirmed.
 """
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from pydantic import BaseModel
@@ -20,8 +21,8 @@ from normalise.fields import (
     norm_date,
     norm_flag,
     norm_name,
-    norm_number,
-    norm_range,
+    parse_number,
+    parse_range,
 )
 from normalise.retrieval import fold
 
@@ -37,7 +38,9 @@ class FhirRequest(BaseModel):
     doc_type: DocType
     extraction: Extraction  # as reviewed
     codes: dict[str, str] = {}  # 'results[3]' / 'diagnoses[0]' -> the code the reviewer kept
-    confirmed: list[str] = []  # field paths the reviewer confirmed, e.g. 'results[3].value'
+    # Field paths the reviewer confirmed, e.g. 'results[3].value'. A chosen code counts only if
+    # confirmed too ('results[3].code'): a resource is human-verified only with its code.
+    confirmed: list[str] = []
     reviewer: str | None = None
 
 
@@ -67,7 +70,11 @@ def build_bundle(req: FhirRequest, now: datetime | None = None) -> dict[str, Any
     subject = {"reference": patient}
     if req.doc_type == "lab":
         observations = [
-            add(_observation(req, i, subject), f"results[{i}]", _row_fields(i))
+            add(
+                _observation(req, i, subject),
+                f"results[{i}]",
+                _row_fields(i, bool(req.codes.get(f"results[{i}]"))),
+            )
             for i in range(len(ext.results))
         ]
         report: dict[str, Any] = {
@@ -86,7 +93,12 @@ def build_bundle(req: FhirRequest, now: datetime | None = None) -> dict[str, Any
         add(report, "report", ["collection_date"])
     else:
         conditions = [
-            add(_condition(req, i, subject), f"diagnoses[{i}]", [f"diagnoses[{i}]"])
+            add(
+                _condition(req, i, subject),
+                f"diagnoses[{i}]",
+                [f"diagnoses[{i}]"]
+                + ([f"diagnoses[{i}].code"] if req.codes.get(f"diagnoses[{i}]") else []),
+            )
             for i in range(len(ext.diagnoses))
         ]
         referral: dict[str, Any] = {
@@ -145,15 +157,23 @@ def build_bundle(req: FhirRequest, now: datetime | None = None) -> dict[str, Any
     }
 
 
-def _row_fields(i: int) -> list[str]:
-    return [f"results[{i}].{f}" for f in ("test_name", "value", "unit", "ref_range", "flag")]
+def _diagnosis_fields(i: int, coded: bool) -> list[str]:
+    return [f"diagnoses[{i}]", f"diagnoses[{i}].code"] if coded else [f"diagnoses[{i}]"]
+
+
+def _row_fields(i: int, coded: bool) -> list[str]:
+    fields = [f"results[{i}].{f}" for f in ("test_name", "value", "unit", "ref_range", "flag")]
+    return [*fields, f"results[{i}].code"] if coded else fields
 
 
 def _date(text: str | None) -> str | None:
+    """An ISO date only if it is a real calendar date: 2024-02-31 is not."""
     if not text:
         return None
-    iso = norm_date(text)
-    return iso if len(iso) == 10 and iso[4] == "-" else None
+    try:
+        return date.fromisoformat(norm_date(text)).isoformat()
+    except ValueError:
+        return None
 
 
 def _patient(ext: Extraction) -> dict[str, Any]:
@@ -193,23 +213,22 @@ def _observation(req: FhirRequest, i: int, subject: dict[str, str]) -> dict[str,
         "code": code,
         "subject": subject,
     }
-    try:
-        quantity: dict[str, Any] = {"value": float(norm_number(r.value))}
+    value = parse_number(r.value)  # finite numbers only: NaN would break the JSON
+    if value is not None:
+        quantity: dict[str, Any] = {"value": value}
         if r.unit:
             quantity["unit"] = r.unit
         obs["valueQuantity"] = quantity
-    except ValueError:
+    else:
         obs["valueString"] = r.value  # not a number: kept as printed, for the reviewer
     if r.ref_range:
-        low, sep, high = norm_range(r.ref_range).partition("-")
         bounds: dict[str, Any] = {"text": r.ref_range}
-        try:
-            if sep and low:
-                bounds["low"] = {"value": float(low)} | ({"unit": r.unit} if r.unit else {})
-            if sep and high:
-                bounds["high"] = {"value": float(high)} | ({"unit": r.unit} if r.unit else {})
-        except ValueError:
-            pass
+        if (parsed := parse_range(r.ref_range)) is not None:
+            unit = {"unit": r.unit} if r.unit else {}
+            if parsed[0] is not None:
+                bounds["low"] = {"value": parsed[0]} | unit
+            if parsed[1] is not None:
+                bounds["high"] = {"value": parsed[1]} | unit
         obs["referenceRange"] = [bounds]
     if r.flag and (flag := norm_flag(r.flag)) in ("H", "L"):
         display = "High" if flag == "H" else "Low"

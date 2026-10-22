@@ -17,6 +17,7 @@ from pathlib import Path
 from datagen.models import LabeledDoc
 from evals.run_llm import sample_docs
 from evals.score import all_correct, prf, score_doc
+from extract.cascade import Cascade
 from extract.llm import GeminiExtractor
 from extract.ner import NerExtractor
 from extract.schema import Extraction
@@ -46,33 +47,34 @@ def main() -> None:
     ner = NerExtractor.from_onnx(args.model_dir)
     gemini = GeminiExtractor(args.gemini_model, Path("data/llm_cache"), client=object())  # type: ignore[arg-type]
 
+    # The cascade is evaluated by running production code, Cascade.run(): it detects the
+    # document type itself and applies the same routing and validity rules. Gemini answers come
+    # from the cache; a cache miss raises, which the cascade treats as an LLM failure.
+    cascade = Cascade(ner, gemini)
     ner_out: dict[str, Extraction] = {}
     ner_ms: dict[str, float] = {}
     gem_out: dict[str, Extraction] = {}
     gem_s: dict[str, float] = {}
-    flagged: dict[str, bool] = {}
+    casc_out: dict[str, Extraction] = {}
+    casc_llm: set[str] = set()
+    type_errors = 0
     for doc in docs:
         start = time.perf_counter()
         ner_out[doc.doc_id] = ner.extract(doc.text)
         ner_ms[doc.doc_id] = 1000 * (time.perf_counter() - start)
         cached = gemini.extract(doc.doc_id, doc.text)  # cache only: the client is a dummy
         gem_out[doc.doc_id], gem_s[doc.doc_id] = cached.extraction, cached.latency_s
-        flagged[doc.doc_id] = bool(validate(ner_out[doc.doc_id], doc.report.doc_type))
+        result = cascade.run(doc.doc_id, doc.text)
+        casc_out[doc.doc_id] = result.extraction
+        if result.source == "llm":
+            casc_llm.add(doc.doc_id)
+        type_errors += result.doc_type != doc.report.doc_type
 
     ner_right = {d.doc_id: all_correct(score_doc(d, ner_out[d.doc_id])) for d in docs}
     systems = {
         "NER only": ner_out,
         "Gemini only": gem_out,
-        # The rule extract.cascade runs: on an objection, keep whichever answer the validator
-        # finds fewer problems with, the LLM's on a tie.
-        "cascade (validator routes)": {
-            d.doc_id: gem_out[d.doc_id]
-            if flagged[d.doc_id]
-            and len(validate(gem_out[d.doc_id], d.report.doc_type))
-            <= len(validate(ner_out[d.doc_id], d.report.doc_type))
-            else ner_out[d.doc_id]
-            for d in docs
-        },
+        "cascade (validator routes)": casc_out,
         "perfect routing (ceiling)": {
             d.doc_id: ner_out[d.doc_id] if ner_right[d.doc_id] else gem_out[d.doc_id] for d in docs
         },
@@ -80,7 +82,7 @@ def main() -> None:
     routed = {
         "NER only": set(),
         "Gemini only": {d.doc_id for d in docs},
-        "cascade (validator routes)": {d.doc_id for d in docs if flagged[d.doc_id]},
+        "cascade (validator routes)": casc_llm,
         "perfect routing (ceiling)": {d.doc_id for d in docs if not ner_right[d.doc_id]},
     }
     report: dict[str, object] = {}
@@ -99,6 +101,7 @@ def main() -> None:
             f"{s['share_to_gemini']:9.1%} {latency:10.2f}"
         )
 
+    flagged = {d.doc_id: bool(validate(ner_out[d.doc_id], d.report.doc_type)) for d in docs}
     wrong = {d.doc_id for d in docs if not ner_right[d.doc_id]}
     caught = {d for d in wrong if flagged[d]}
     false_alarms = {d.doc_id for d in docs if flagged[d.doc_id]} - wrong
@@ -117,6 +120,8 @@ def main() -> None:
         for d in docs
     )
     report["cascade_needs_review"] = still / len(docs)
+    report["doc_type_errors"] = type_errors
+    print(f"document type misdetected by the cascade: {type_errors} of {len(docs)}")
     print(f"after the cascade, {still} documents ({still / len(docs):.1%}) still raise an issue")
     args.out.write_text(json.dumps(report, indent=2) + "\n")
 

@@ -49,7 +49,7 @@ jobs:
       - name: Deploy
         run: |
           sam deploy --template-file infra/template.yaml --stack-name nwoma-api \
-            --region "$AWS_REGION" --capabilities CAPABILITY_IAM \
+            --region "$AWS_REGION" \
             --image-repository ${{ vars.ECR_REPOSITORY_URI }} \
             --parameter-overrides ImageUri=${{ steps.image.outputs.uri }} ReservedConcurrency=${{ vars.RESERVED_CONCURRENCY || '1' }} \
             --tags project=nwoma --no-confirm-changeset --no-fail-on-empty-changeset

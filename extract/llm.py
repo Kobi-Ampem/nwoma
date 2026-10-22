@@ -85,15 +85,20 @@ class GeminiExtractor:
     def __init__(
         self,
         model: str,
-        cache_dir: Path,
+        cache_dir: Path | None,
         client: genai.Client | None = None,
         min_interval_s: float = 0.0,
         thinking_level: str | None = None,
+        retries: int = _RETRIES,
+        timeout_ms: int = _TIMEOUT_MS,
     ) -> None:
+        """`cache_dir=None` stores nothing: the API's setting. Evaluations cache to disk so
+        reruns are free; the API must keep its promise that documents are not stored."""
         self.model = model
-        self.cache_dir = cache_dir / model  # then one folder per prompt version
+        self.cache_dir = cache_dir / model if cache_dir else None  # then one folder per prompt
+        self.retries = retries
         # Reads GEMINI_API_KEY.
-        self.client = client or genai.Client(http_options=types.HttpOptions(timeout=_TIMEOUT_MS))
+        self.client = client or genai.Client(http_options=types.HttpOptions(timeout=timeout_ms))
         self.min_interval_s = min_interval_s  # spaces calls to stay under requests per minute
         self.config = types.GenerateContentConfig(
             temperature=0.0,
@@ -111,6 +116,8 @@ class GeminiExtractor:
         """Each document type has its own prompt and cache folder, so adding a prompt for one
         type never invalidates the cached answers for another."""
         prompt = PROMPTS[doc_type or detect_doc_type(text)]
+        if self.cache_dir is None:
+            return self._call(prompt, text)
         key = hashlib.sha256(text.encode()).hexdigest()[:12]
         path = self.cache_dir / prompt_version(prompt) / f"{doc_id}-{key}.json"
         if path.exists():
@@ -140,7 +147,7 @@ class GeminiExtractor:
         return result
 
     def _call(self, prompt: str, text: str) -> LLMResult:
-        for attempt in range(_RETRIES):
+        for attempt in range(self.retries):
             wait = self.min_interval_s - (time.monotonic() - self._last_call)
             if wait > 0:
                 time.sleep(wait)
@@ -153,12 +160,12 @@ class GeminiExtractor:
             except errors.APIError as e:
                 if e.code == 429 and "day" in str(e).lower():
                     raise QuotaExhausted(str(e)) from e
-                if e.code in (429, 500, 503) and attempt < _RETRIES - 1:
+                if e.code in (429, 500, 503) and attempt < self.retries - 1:
                     time.sleep(2 ** (attempt + 2))  # 4, 8, 16, 32 s: give the service room
                     continue
                 raise
             except httpx.TransportError:  # timed out or the connection dropped
-                if attempt < _RETRIES - 1:
+                if attempt < self.retries - 1:
                     time.sleep(2 ** (attempt + 2))
                     continue
                 raise

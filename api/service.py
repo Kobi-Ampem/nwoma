@@ -5,13 +5,11 @@ Nothing is stored: a document is read, answered and forgotten.
 """
 
 import hashlib
-import io
 import os
 import time
 from pathlib import Path
 from typing import Literal
 
-from PIL import Image
 from pydantic import BaseModel
 
 from extract.cascade import Cascade
@@ -22,7 +20,7 @@ from extract.schema import Extraction
 from normalise.embed import Embedder
 from normalise.icd10 import Icd10Mapper
 from normalise.loinc import LoincMapper
-from ocr.text_layer import ocr_image, read_pdf
+from ocr.text_layer import UnreadableDocument, read_image, read_pdf
 
 MAX_BYTES = 5 * 1024 * 1024
 
@@ -73,7 +71,9 @@ class Nwoma:
         llm = None
         if os.environ.get("GEMINI_API_KEY", "none").strip() not in ("", "none"):
             model = llm_model or os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
-            llm = GeminiExtractor(model, Path(os.environ.get("LLM_CACHE", "/tmp/llm_cache")))
+            # No disk cache (nothing is stored) and a short budget: 2 tries of 25 s at most, so a
+            # Gemini outage ends in the local answer well inside Lambda's 120 s timeout.
+            llm = GeminiExtractor(model, None, retries=2, timeout_ms=25_000)
         self.cascade = Cascade(NerExtractor.from_onnx(model_dir), llm)
 
     @property
@@ -83,13 +83,12 @@ class Nwoma:
     def read(self, data: bytes, filename: str = "") -> tuple[str, Literal["text_layer", "ocr"]]:
         if len(data) > MAX_BYTES:
             raise UnsupportedDocument("documents are limited to 5 MB")
-        if data[:5] == b"%PDF-":
-            return read_pdf(data)
         try:
-            image = Image.open(io.BytesIO(data)).convert("L")
-        except OSError as e:
-            raise UnsupportedDocument(f"{filename or 'file'} is not a PDF or an image") from e
-        return ocr_image(image), "ocr"
+            if data[:5] == b"%PDF-":
+                return read_pdf(data)
+            return read_image(data), "ocr"
+        except UnreadableDocument as e:
+            raise UnsupportedDocument(str(e)) from e
 
     def extract(self, data: bytes, filename: str = "") -> ExtractResponse:
         start = time.perf_counter()

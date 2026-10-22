@@ -118,29 +118,26 @@ Resources:
                   - lambda:UpdateFunctionConfiguration
                   - lambda:UpdateFunctionUrlConfig
                 Resource: !Sub arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:nwoma-api
-              - Sid: ManageApiRole
+              # The function's execution role lives in this stack; deploys may only pass it to
+              # Lambda, never create or change roles (no privilege escalation through a deploy).
+              - Sid: PassExecutionRoleToLambda
                 Effect: Allow
-                Action:
-                  - iam:AttachRolePolicy
-                  - iam:CreateRole
-                  - iam:DeleteRole
-                  - iam:DeleteRolePolicy
-                  - iam:DetachRolePolicy
-                  - iam:GetRole
-                  - iam:GetRolePolicy
-                  - iam:PassRole
-                  - iam:PutRolePolicy
-                  - iam:TagRole
-                  - iam:UntagRole
-                Resource: !Sub arn:aws:iam::${AWS::AccountId}:role/nwoma-api-*
+                Action: iam:PassRole
+                Resource: !GetAtt ApiExecutionRole.Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: lambda.amazonaws.com
               - Sid: ManageApiLogs
                 Effect: Allow
                 Action:
                   - logs:CreateLogGroup
                   - logs:DeleteLogGroup
-                  - logs:DescribeLogGroups
                   - logs:PutRetentionPolicy
                   - logs:TagResource
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/nwoma-api*
+              - Sid: ListLogGroups  # describe calls cannot be scoped to one group
+                Effect: Allow
+                Action: logs:DescribeLogGroups
                 Resource: "*"
               - Sid: ManageKeepWarmSchedule
                 Effect: Allow
@@ -156,6 +153,28 @@ Resources:
                 Effect: Allow
                 Action: ssm:GetParameters
                 Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/nwoma/*
+      Tags:
+        - {Key: project, Value: nwoma}
+
+  # The API's execution role: write its own logs, nothing else.
+  ApiExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: nwoma-api-execution
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: own-logs-only
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/nwoma-api:*
       Tags:
         - {Key: project, Value: nwoma}
 
@@ -310,6 +329,9 @@ Resources:
             - {SubscriptionType: SNS, Address: !Ref KillSwitchTopic}
 
 Outputs:
+  ApiExecutionRoleArn:
+    Description: The app stack's ExecutionRoleArn parameter
+    Value: !GetAtt ApiExecutionRole.Arn
   DeployRoleArn:
     Description: GitHub repository variable AWS_DEPLOY_ROLE_ARN
     Value: !GetAtt DeployRole.Arn

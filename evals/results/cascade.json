@@ -1,35 +1,35 @@
 {
   "NER only": {
-    "precision": 0.9168432737915027,
-    "recall": 0.9232723577235772,
-    "f1": 0.9200465846371968,
+    "precision": 0.9163891411847815,
+    "recall": 0.9228150406504065,
+    "f1": 0.9195908653602715,
     "doc_all_correct": 0.578,
     "share_to_gemini": 0.0,
-    "mean_seconds_per_doc": 0.16704513235182095
+    "mean_seconds_per_doc": 0.14755862665979658
   },
   "Gemini only": {
-    "precision": 0.9573599918392329,
-    "recall": 0.953760162601626,
-    "f1": 0.9555566868604591,
+    "precision": 0.9567479343058247,
+    "recall": 0.953150406504065,
+    "f1": 0.9549457822124929,
     "doc_all_correct": 0.594,
     "share_to_gemini": 1.0,
     "mean_seconds_per_doc": 2.7082646825180854
   },
   "cascade (validator routes)": {
-    "precision": 0.9575411590804832,
-    "recall": 0.9545731707317073,
-    "f1": 0.9560548614468561,
-    "doc_all_correct": 0.622,
-    "share_to_gemini": 0.332,
-    "mean_seconds_per_doc": 1.2230509552738367
+    "precision": 0.9569295071104541,
+    "recall": 0.9539634146341464,
+    "f1": 0.95544415888445,
+    "doc_all_correct": 0.62,
+    "share_to_gemini": 0.328,
+    "mean_seconds_per_doc": 1.1943862971378112
   },
   "perfect routing (ceiling)": {
-    "precision": 0.9578915171288744,
-    "recall": 0.9547764227642277,
-    "f1": 0.9563314332247557,
+    "precision": 0.9572797716150081,
+    "recall": 0.9541666666666667,
+    "f1": 0.9557206840390879,
     "doc_all_correct": 0.634,
     "share_to_gemini": 0.422,
-    "mean_seconds_per_doc": 1.5190945660639263
+    "mean_seconds_per_doc": 1.499608060371902
   },
   "validator_on_ner": {
     "ner_docs_wrong": 211,
@@ -37,5 +37,6 @@
     "false_alarms": 12,
     "catch_rate": 0.7298578199052133
   },
-  "cascade_needs_review": 0.258
+  "cascade_needs_review": 0.264,
+  "doc_type_errors": 0
 }

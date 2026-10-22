@@ -13,9 +13,8 @@ from datetime import date
 
 from extract.doctype import DocType
 from extract.schema import Extraction
-from normalise.fields import norm_date, norm_flag, norm_number, norm_range
+from normalise.fields import norm_date, norm_flag, parse_number, parse_range
 
-_NUMBER = re.compile(r"^\d+(\.\d+)?$")
 _DOSE = re.compile(r"\d")
 
 
@@ -31,15 +30,6 @@ def _iso(text: str | None) -> date | None:
         return None
     try:
         return date.fromisoformat(norm_date(text))
-    except ValueError:
-        return None
-
-
-def _bounds(ref_range: str) -> tuple[float | None, float | None] | None:
-    """(low, high) from a normalised range '3.5-5.1', '60.0-' or '-200.0'; None if unreadable."""
-    low, sep, high = norm_range(ref_range).partition("-")
-    try:
-        return (float(low) if low else None, float(high) if high else None) if sep else None
     except ValueError:
         return None
 
@@ -84,11 +74,11 @@ def _check_results(ext: Extraction, add: Callable[[str, str, str], None]) -> Non
             add(f"{where}.test_name", "missing", "result row without a test name")
         if names.count(r.test_name.casefold()) > 1 and r.test_name:
             add(f"{where}.test_name", "duplicate", f"'{r.test_name}' appears more than once")
-        value = norm_number(r.value) if r.value else ""
-        if not value:
+        if not r.value:
             add(f"{where}.value", "missing", f"no value for {r.test_name or 'a test'}")
             continue
-        if not _NUMBER.match(value):
+        v = parse_number(r.value)
+        if v is None:
             add(f"{where}.value", "not_a_number", f"value '{r.value}' is not a number")
             continue
         flag = norm_flag(r.flag) if r.flag else None
@@ -97,12 +87,11 @@ def _check_results(ext: Extraction, add: Callable[[str, str, str], None]) -> Non
             continue
         if not r.ref_range:
             continue
-        bounds = _bounds(r.ref_range)
+        bounds = parse_range(r.ref_range)
         if bounds is None:
             add(f"{where}.ref_range", "unreadable_range", f"range '{r.ref_range}' unreadable")
             continue
         low, high = bounds
-        v = float(value)
         expected = None
         if high is not None and v > high:
             expected = "H"

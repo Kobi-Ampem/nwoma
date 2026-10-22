@@ -3,6 +3,7 @@
     uv run uvicorn api.app:app --port 8000
 
 POST /extract   a PDF or image (max 5 MB) -> fields, issues for review, code suggestions
+POST /codes     fresh code suggestions after a reviewer edits a name, unit or diagnosis
 POST /fhir      a reviewed extraction -> FHIR R4 Bundle with Provenance
 GET  /samples   synthetic sample documents to try
 GET  /health    liveness, and whether the LLM fallback is on
@@ -12,15 +13,16 @@ import os
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 
 from api.fhir import FhirRequest, build_bundle
-from api.service import MAX_BYTES, ExtractResponse, Nwoma, UnsupportedDocument
+from api.service import MAX_BYTES, CodeSuggestion, ExtractResponse, Nwoma, UnsupportedDocument
 
 SAMPLES = Path(__file__).parent / "samples"
 load_dotenv()  # local development; in AWS the settings come from the function's environment
@@ -60,14 +62,32 @@ def events() -> dict[str, str]:
 
 
 @app.post("/extract")
-async def extract(request: Request, file: Annotated[UploadFile, File()]) -> ExtractResponse:
-    data = await file.read(MAX_BYTES + 1)
+def extract(request: Request, file: Annotated[UploadFile, File()]) -> ExtractResponse:
+    # A plain def: FastAPI runs it in a worker thread, so OCR and inference never block the
+    # server's event loop.
+    data = file.file.read(MAX_BYTES + 1)
     if len(data) > MAX_BYTES:
         raise HTTPException(413, "documents are limited to 5 MB")
     try:
         return _nwoma(request).extract(data, file.filename or "")
     except UnsupportedDocument as e:
         raise HTTPException(415, str(e)) from e
+
+
+class CodesRequest(BaseModel):
+    kind: Literal["lab", "diagnosis"]
+    text: str = Field(max_length=200)
+    unit: str | None = Field(default=None, max_length=40)
+
+
+@app.post("/codes")
+def codes(request: Request, req: CodesRequest) -> list[CodeSuggestion]:
+    """Fresh suggestions after a reviewer edits a test name, unit or diagnosis: the codes
+    chosen for the old text must not survive the edit."""
+    service = _nwoma(request)
+    if req.kind == "lab":
+        return service.lab_codes(req.text, req.unit)
+    return service.diagnosis_codes(req.text)
 
 
 @app.post("/fhir")

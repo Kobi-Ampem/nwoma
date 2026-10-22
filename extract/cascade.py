@@ -46,6 +46,10 @@ class Cascade:
                 llm = self.llm.extract(doc_id, text, doc_type)
             except QuotaExhausted:
                 notes.append("LLM quota exhausted: issues are left for review")
+            except Exception as e:  # outage, timeout, bad reply: the local answer still stands
+                notes.append(
+                    f"LLM fallback failed ({type(e).__name__}): issues are left for review"
+                )
             else:
                 llm_issues = validate(llm.extraction, doc_type)
                 # Keep whichever answer the validator finds fewer problems with; on a tie the
