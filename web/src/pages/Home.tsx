@@ -25,7 +25,8 @@ export function Home(props: {
 
   return (
     <>
-      <section className="hero">
+      <section className="band">
+      <div className="container hero">
         <div>
           <h1>
             Clinical documents in, <span>coded and verified</span> records out.
@@ -105,9 +106,33 @@ export function Home(props: {
             </p>
           )}
         </div>
+      </div>
       </section>
 
-      <div className="trust">
+      <section className="container flow">
+        <div>
+          <h2>From document to record</h2>
+          <ol className="flow-steps">
+            <li>
+              <b>Upload</b>
+              <span>A PDF or a photo of a lab report or referral letter. Scans are read by OCR, in English or French.</span>
+            </li>
+            <li>
+              <b>Review</b>
+              <span>The original sits beside every extracted field. Anything doubtful is flagged; codes come as five suggestions to choose from.</span>
+            </li>
+            <li>
+              <b>Export</b>
+              <span>A FHIR record for your system, or a readable summary to print, with what you verified signed in your name.</span>
+            </li>
+          </ol>
+        </div>
+        <figure className="preview">
+          <img src={`${import.meta.env.BASE_URL}review-preview.webp`} alt="The review screen: the original scanned report beside the extracted fields and suggested LOINC codes" width={1320} height={780} loading="lazy" />
+        </figure>
+      </section>
+
+      <div className="container trust">
         <div className="card">
           <h3>Nothing is stored</h3>
           <p className="muted small">A document is read, answered and forgotten. Review happens in your browser.</p>

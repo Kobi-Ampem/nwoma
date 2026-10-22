@@ -69,7 +69,7 @@ export default function App() {
   const update = (change: (s: Session) => Session) => setSession((s) => (s ? change(s) : s))
 
   return (
-    <>
+    <div className="app">
       <header className="topbar">
         <div className="topbar-inner">
           <a className="brand" href="#/">
@@ -83,7 +83,7 @@ export default function App() {
           </nav>
         </div>
       </header>
-      <main className="page">
+      <main className={page === 'home' ? 'home' : 'page'}>
         {page === 'home' && <Home samples={sampleList} busy={busy} slow={slow} error={error} onFile={run} onSample={runSample} />}
         {page === 'review' && session && <Review session={session} update={update} reviewer={reviewer} setReviewer={setReviewer} />}
         {page === 'summary' && session && <Summary session={session} reviewer={reviewer} />}
@@ -94,6 +94,6 @@ export default function App() {
         <a href="https://github.com/Kobi-Ampem/nwoma">GitHub</a>
         <span>API {API_URL.replace(/^https?:\/\//, '').slice(0, 32)}…</span>
       </footer>
-    </>
+    </div>
   )
 }
