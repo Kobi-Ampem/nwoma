@@ -60,7 +60,7 @@ the same documents as the Gemini baseline. F1 over every field, after the shared
 | All | 0.920 | 57.8% |
 | Lab reports | 0.909 | 44.7% |
 | Referral letters | 0.981 | 77.5% |
-| Digital / scanned | 0.969 / 0.876 | |
+| Digital / scanned | 0.969 / 0.875 | |
 | English / French | 0.947 / 0.891 | |
 | Seen layouts / unseen layouts | 0.947 / 0.893 | |
 
@@ -68,7 +68,7 @@ By field: dates, sex, clinician 0.97 to 0.99; test names 0.96; values 0.90; unit
 0.90; **flags 0.71**; referral fields 0.97 to 1.00.
 
 Ceiling on scans: a model that copies text cannot recover what OCR destroyed; copying perfect
-labels scores 0.888 on scans. The model reaches 0.876 there.
+labels scores 0.888 on scans. The model reaches 0.875 there.
 
 Comparison: Gemini reaches 0.955 on the same documents (2.7 s per document); the cascade, local
 model first and Gemini when the validator objects, also reaches 0.955 with 33% of documents sent
