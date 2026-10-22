@@ -12,6 +12,7 @@ cannot hand the agent an answer.
 
 import hashlib
 import json
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -27,7 +28,7 @@ from normalise.icd10 import Icd10Mapper
 from normalise.loinc import LoincMapper
 
 MAX_STEPS = 5
-_RETRIES = 4
+_RETRIES = 6
 
 PROMPT = """You assign standard codes to items extracted from a clinical document.
 Lab results get a LOINC code; diagnoses get an ICD-10-CM code.
@@ -121,8 +122,11 @@ class CodingAgent:
         icd10: Icd10Mapper,
         cache_dir: Path,
         client: genai.Client | None = None,
+        min_interval_s: float = 0.0,
     ) -> None:
         self.model = model
+        self.min_interval_s = min_interval_s  # the free tier allows 15 requests a minute
+        self._last_call = 0.0
         self.loinc = loinc
         self.icd10 = icd10
         self.cache_dir = cache_dir / model
@@ -245,6 +249,10 @@ class CodingAgent:
 
     def _call(self, contents: list[Any], config: types.GenerateContentConfig) -> Any:
         for attempt in range(_RETRIES):
+            wait = self.min_interval_s - (time.monotonic() - self._last_call)
+            if wait > 0:
+                time.sleep(wait)
+            self._last_call = time.monotonic()
             try:
                 return self.client.models.generate_content(
                     model=self.model, contents=contents, config=config
@@ -253,7 +261,9 @@ class CodingAgent:
                 if e.code == 429 and "day" in str(e).lower():
                     raise QuotaExhausted(str(e)) from e
                 if e.code in (429, 500, 503) and attempt < _RETRIES - 1:
-                    time.sleep(2 ** (attempt + 2))
+                    # A per-minute 429 says when to retry ("retry in 14s"); otherwise back off.
+                    hint = re.search(r"retry in ([\d.]+)s", str(e))
+                    time.sleep(float(hint[1]) + 1 if hint else 2 ** (attempt + 2))
                     continue
                 raise
         raise RuntimeError("unreachable")

@@ -41,7 +41,8 @@ def main() -> None:
         embed,
         Path("data/cache/icd10_names.npy"),
     )
-    agent = CodingAgent(args.model, loinc, icd10, Path("data/agent_cache"))
+    # 14 requests a minute: under the free tier's 15, with each agent step being one request.
+    agent = CodingAgent(args.model, loinc, icd10, Path("data/agent_cache"), min_interval_s=60 / 14)
     half = args.docs // 2
     docs = sample_docs(args.labels, ["test", "test_unseen"], half, args.seed, half)
 
@@ -140,7 +141,8 @@ def main() -> None:
     )
     for e in examples:
         print("  fixed:", e)
-    args.out.write_text(json.dumps(report_out, indent=2) + "\n")
+    if done:  # never replace earlier results with an empty run
+        args.out.write_text(json.dumps(report_out, indent=2) + "\n")
 
 
 if __name__ == "__main__":
