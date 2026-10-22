@@ -56,6 +56,14 @@ export interface ExtractResponse {
 
 export const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8000'
 
+// fetch() rejects with a bare TypeError ("Failed to fetch") when the server cannot be reached.
+export function explain(e: unknown): string {
+  if (e instanceof TypeError) {
+    return 'The Nwoma server could not be reached. If it has been idle it may be starting up: try again in a minute.'
+  }
+  return e instanceof Error ? e.message : String(e)
+}
+
 async function check(response: Response): Promise<Response> {
   if (!response.ok) {
     const body = await response.json().catch(() => ({}))
@@ -77,6 +85,20 @@ export async function samples(): Promise<{ name: string; url: string }[]> {
 
 export async function sampleFile(url: string): Promise<Blob> {
   return (await check(await fetch(`${API_URL}${url}`))).blob()
+}
+
+// Fresh suggestions after a reviewer edits a test name, unit or diagnosis.
+export async function suggestCodes(
+  kind: 'lab' | 'diagnosis',
+  text: string,
+  unit: string | null = null,
+): Promise<CodeSuggestion[]> {
+  const response = await fetch(`${API_URL}/codes`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ kind, text, unit }),
+  })
+  return (await check(response)).json()
 }
 
 export interface FhirRequest {

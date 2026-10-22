@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Extraction } from './api'
-import { fieldRows, locate, setField } from './review'
+import { allPaths, codeKeyAffectedBy, fieldRows, itemPaths, locate, setField } from './review'
 
 const lab: Extraction = {
   patient_name: 'MENSAH Ama',
@@ -30,6 +30,27 @@ describe('review', () => {
     expect(setField(lab, 'patient_name', 'Ama Mensah').patient_name).toBe('Ama Mensah')
   })
 
+  it('makes a coded row include its code, so confirming the row confirms the code', () => {
+    expect(itemPaths('results[0]', true)).toContain('results[0].code')
+    expect(itemPaths('results[0]', false)).not.toContain('results[0].code')
+    expect(itemPaths('diagnoses[2]', true)).toEqual(['diagnoses[2]', 'diagnoses[2].code'])
+    expect(itemPaths('patient_name', true)).toEqual(['patient_name'])
+  })
+
+  it('knows which edits invalidate a code', () => {
+    // Codex audit #3: correcting mg/dL to µmol/L must not keep the mass-concentration code.
+    expect(codeKeyAffectedBy('results[3].unit')).toBe('results[3]')
+    expect(codeKeyAffectedBy('results[3].test_name')).toBe('results[3]')
+    expect(codeKeyAffectedBy('results[3].value')).toBeNull()
+    expect(codeKeyAffectedBy('diagnoses[1]')).toBe('diagnoses[1]')
+    expect(codeKeyAffectedBy('medications[0].dose')).toBeNull()
+  })
+
+  it('counts every header field, result field and chosen code for progress', () => {
+    const paths = allPaths(lab, 'lab', { 'results[0]': '2345-7' })
+    expect(paths).toHaveLength(5 + 5 + 1) // header, result fields, its code
+  })
+
   it('finds fields in the text, across line breaks, without overlaps', () => {
     const text = 'Name: MENSAH Ama\nGlucose 140 mg/dL 70 -\n99 H'
     const found = locate(text, fieldRows(lab, 'lab'))
@@ -37,11 +58,5 @@ describe('review', () => {
     expect(byPath['patient_name']).toBe('MENSAH Ama')
     expect(byPath['results[0].ref_range']).toBe('70 -\n99')
     expect(byPath['results[0].flag']).toBeUndefined() // one letter: too short to place safely
-  })
-
-  it('gives every diagnosis its own group, so each gets a code choice', () => {
-    const letter = { ...lab, results: [], diagnoses: ['Anémie', 'Obésité'] }
-    const groups = new Set(fieldRows(letter, 'referral').filter((r) => r.path.startsWith('diagnoses')).map((r) => r.group))
-    expect(groups.size).toBe(2)
   })
 })

@@ -1,56 +1,69 @@
 // Review logic, kept out of the components so it can be tested on its own.
-import type { Extraction } from './api'
+import type { DocType, Extraction } from './api'
 
-// One editable field on the review form, addressed by its path, e.g. 'results[3].flag'.
+// One editable field, addressed by its path, e.g. 'results[3].flag'.
 export interface FieldRow {
   path: string
   label: string
   value: string
-  group: string
 }
 
-const HEADER: [keyof Extraction, string][] = [
-  ['patient_name', 'Patient'],
-  ['birth_date', 'Date of birth'],
-  ['sex', 'Sex'],
-  ['collection_date', 'Collected'],
-  ['clinician', 'Clinician'],
-  ['reason', 'Reason for referral'],
+export const HEADER_FIELDS: { key: keyof Extraction; label: string; types: DocType[] }[] = [
+  { key: 'patient_name', label: 'Patient', types: ['lab', 'referral'] },
+  { key: 'birth_date', label: 'Date of birth', types: ['lab', 'referral'] },
+  { key: 'sex', label: 'Sex', types: ['lab', 'referral'] },
+  { key: 'collection_date', label: 'Collected', types: ['lab'] },
+  { key: 'clinician', label: 'Clinician', types: ['lab', 'referral'] },
+  { key: 'reason', label: 'Reason for referral', types: ['referral'] },
 ]
 
-export function fieldRows(ext: Extraction, docType: 'lab' | 'referral'): FieldRow[] {
-  const rows: FieldRow[] = []
-  for (const [key, label] of HEADER) {
-    if (docType === 'lab' && key === 'reason') continue
-    if (docType === 'referral' && key === 'collection_date') continue
-    rows.push({ path: key, label, value: (ext[key] as string | null) ?? '', group: 'Patient and document' })
-  }
-  ext.results.forEach((r, i) => {
-    const group = `Result ${i + 1}: ${r.test_name || 'unnamed'}`
-    rows.push(
-      { path: `results[${i}].test_name`, label: 'Test', value: r.test_name, group },
-      { path: `results[${i}].value`, label: 'Value', value: r.value, group },
-      { path: `results[${i}].unit`, label: 'Unit', value: r.unit ?? '', group },
-      { path: `results[${i}].ref_range`, label: 'Reference range', value: r.ref_range ?? '', group },
-      { path: `results[${i}].flag`, label: 'Flag', value: r.flag ?? '', group },
-    )
-  })
-  // One group per diagnosis, like results: each carries its own ICD-10 code choice.
-  ext.diagnoses.forEach((d, i) =>
-    rows.push({ path: `diagnoses[${i}]`, label: 'As written', value: d, group: `Diagnosis ${i + 1}: ${d || 'unnamed'}` }),
+export const RESULT_FIELDS = ['test_name', 'value', 'unit', 'ref_range', 'flag'] as const
+export const MEDICATION_FIELDS = ['name', 'dose', 'frequency'] as const
+
+// Every editable field of the extraction, in reading order.
+export function fieldRows(ext: Extraction, docType: DocType): FieldRow[] {
+  const rows: FieldRow[] = HEADER_FIELDS.filter((f) => f.types.includes(docType)).map((f) => ({
+    path: f.key,
+    label: f.label,
+    value: (ext[f.key] as string | null) ?? '',
+  }))
+  ext.results.forEach((r, i) =>
+    RESULT_FIELDS.forEach((f) => rows.push({ path: `results[${i}].${f}`, label: f, value: r[f] ?? '' })),
   )
-  ext.medications.forEach((m, i) => {
-    const group = `Medication ${i + 1}`
-    rows.push(
-      { path: `medications[${i}].name`, label: 'Name', value: m.name, group },
-      { path: `medications[${i}].dose`, label: 'Dose', value: m.dose ?? '', group },
-      { path: `medications[${i}].frequency`, label: 'Frequency', value: m.frequency ?? '', group },
-    )
-  })
-  ext.allergies.forEach((a, i) =>
-    rows.push({ path: `allergies[${i}]`, label: `Allergy ${i + 1}`, value: a, group: 'Allergies' }),
+  ext.diagnoses.forEach((d, i) => rows.push({ path: `diagnoses[${i}]`, label: 'diagnosis', value: d }))
+  ext.medications.forEach((m, i) =>
+    MEDICATION_FIELDS.forEach((f) => rows.push({ path: `medications[${i}].${f}`, label: f, value: m[f] ?? '' })),
   )
+  ext.allergies.forEach((a, i) => rows.push({ path: `allergies[${i}]`, label: 'allergy', value: a }))
   return rows
+}
+
+// The paths one review item covers. A coded item includes its code: confirming a row confirms
+// the code chosen for it, and only then is the FHIR resource marked human-verified.
+export function itemPaths(key: string, coded: boolean): string[] {
+  const m = /^(\w+)\[(\d+)\]$/.exec(key)
+  if (!m) return [key]
+  const [, list, i] = m
+  const fields =
+    list === 'results'
+      ? RESULT_FIELDS.map((f) => `${key}.${f}`)
+      : list === 'medications'
+        ? MEDICATION_FIELDS.map((f) => `${key}.${f}`)
+        : [key]
+  return coded && (list === 'results' || list === 'diagnoses') && i !== undefined ? [...fields, `${key}.code`] : fields
+}
+
+// Every path the reviewer can confirm, for the progress bar.
+export function allPaths(ext: Extraction, docType: DocType, codes: Record<string, string>): string[] {
+  const paths = HEADER_FIELDS.filter((f) => f.types.includes(docType)).map((f) => f.key as string)
+  const keys = [
+    ...ext.results.map((_, i) => `results[${i}]`),
+    ...ext.diagnoses.map((_, i) => `diagnoses[${i}]`),
+    ...ext.medications.map((_, i) => `medications[${i}]`),
+    ...ext.allergies.map((_, i) => `allergies[${i}]`),
+  ]
+  keys.forEach((k) => paths.push(...itemPaths(k, Boolean(codes[k]))))
+  return paths
 }
 
 const PATH = /^(\w+)(?:\[(\d+)\])?(?:\.(\w+))?$/
@@ -70,6 +83,12 @@ export function setField(ext: Extraction, path: string, value: string): Extracti
     item[sub] = value === '' && sub !== 'test_name' && sub !== 'name' && sub !== 'value' ? null : value
   }
   return next as unknown as Extraction
+}
+
+// Edits that change which code is right: a lab test's name or unit, or a diagnosis.
+export function codeKeyAffectedBy(path: string): string | null {
+  const m = /^(results\[\d+\])\.(test_name|unit)$/.exec(path) ?? /^(diagnoses\[\d+\])$/.exec(path)
+  return m ? m[1] : null
 }
 
 export interface Highlight {
