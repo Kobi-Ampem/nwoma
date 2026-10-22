@@ -82,3 +82,18 @@ def test_a_second_run_is_served_from_the_cache(tmp_path: Path) -> None:
     agent.run("doc1", "lab", ITEMS, "text")
     again = agent.run("doc1", "lab", ITEMS, "text")
     assert again.cached and len(model.configs) == 1
+
+
+def test_a_tool_called_with_odd_arguments_does_not_crash_the_run(tmp_path: Path) -> None:
+    # Gemini once passed read_document a list where the schema says a string.
+    agent, _ = _agent(
+        tmp_path,
+        [
+            _reply(
+                ("read_document", {"words": ["potassium", "serum"]}), ("search_icd10", {"bad": 1})
+            ),
+            _reply(("submit_codes", {"codes": [{"id": "r0", "code": "2823-3"}]})),
+        ],
+    )
+    run = agent.run("doc1", "lab", ITEMS, "Kaliémie 4,0 mmol/L\nPotassium serum")
+    assert run.codes == {"r0": "2823-3"}

@@ -160,8 +160,10 @@ class CodingAgent:
                 return "low"
             return "normal"
 
-        def read_document(words: str) -> list[str]:
-            wanted = [w.casefold() for w in words.split() if len(w) > 1]
+        def read_document(words: str | list[str]) -> list[str]:
+            # Models sometimes pass a list where the schema says a string; accept both.
+            text_words = " ".join(words) if isinstance(words, list) else str(words)
+            wanted = [w.casefold() for w in text_words.split() if len(w) > 1]
             lines = [
                 line for line in text.splitlines() if any(w in line.casefold() for w in wanted)
             ]
@@ -237,8 +239,8 @@ class CodingAgent:
                     return AgentRun(codes, step, calls_made, tokens_in, tokens_out, elapsed)
                 try:
                     output: Any = tools[call.name](**args)
-                except (KeyError, TypeError) as e:  # unknown tool or wrong arguments
-                    output = f"error: {e}"
+                except Exception as e:  # any tool failure goes back to the model, never crashes
+                    output = f"error: {type(e).__name__}: {e}"
                 replies.append(
                     types.Part.from_function_response(name=call.name, response={"result": output})
                 )
