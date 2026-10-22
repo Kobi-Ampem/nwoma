@@ -142,6 +142,16 @@ Resources:
                   - logs:PutRetentionPolicy
                   - logs:TagResource
                 Resource: "*"
+              - Sid: ManageKeepWarmSchedule
+                Effect: Allow
+                Action:
+                  - events:DeleteRule
+                  - events:DescribeRule
+                  - events:PutRule
+                  - events:PutTargets
+                  - events:RemoveTargets
+                  - events:TagResource
+                Resource: !Sub arn:aws:events:${AWS::Region}:${AWS::AccountId}:rule/nwoma-api-*
               - Sid: ReadGeminiKeyAtDeploy
                 Effect: Allow
                 Action: ssm:GetParameters

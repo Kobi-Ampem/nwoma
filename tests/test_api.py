@@ -63,3 +63,7 @@ def test_samples_cannot_escape_their_folder() -> None:
     names = [s["name"] for s in client.get("/samples").json()]
     assert "lab-report-en-digital.pdf" in names
     assert client.get("/samples/..%2F..%2FREADME.md").status_code == 404
+
+
+def test_the_keep_warm_ping_is_answered() -> None:
+    assert _client().post("/events", json={"source": "aws.events"}).json() == {"status": "warm"}

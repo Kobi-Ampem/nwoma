@@ -46,7 +46,12 @@ Lambda Web Adapter runs the FastAPI app unchanged, with asynchronous initialisat
 
 ## Consequences
 
-- Cold starts take about 15 s; the first request after idle is slow. Provisioned concurrency
-  would fix it and cost money, so it is left out.
+- Measured live, a cold start takes 3-4 minutes: Lambda loads the ~2 GB image lazily, so the
+  first read of each model file is slow. An EventBridge rule pings the function every 5 minutes
+  to keep one instance loaded (free: scheduled rules cost nothing and the pings fit the Lambda
+  free tier). Provisioned concurrency would guarantee it but costs money. The first request
+  after a deploy, or after AWS recycles the instance, is still slow; the UI says so.
+- Lambda limits found on this account: 10 concurrent executions in total and 3,008 MB of
+  memory. Peak memory was cut from 2.85 GB to 2.1 GB (numpy postings, float16 vectors) to fit.
 - If the account's total Lambda limit is 10, AWS refuses the reservation of 1; set the
   repository variable `RESERVED_CONCURRENCY=none`. The kill switch works either way.

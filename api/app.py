@@ -53,6 +53,12 @@ def health(request: Request) -> dict[str, Any]:
     return {"status": "ok", "llm_enabled": _nwoma(request).llm_enabled}
 
 
+@app.post("/events")
+def events() -> dict[str, str]:
+    """Lambda Web Adapter forwards non-HTTP events (the keep-warm schedule) here."""
+    return {"status": "warm"}
+
+
 @app.post("/extract")
 async def extract(request: Request, file: Annotated[UploadFile, File()]) -> ExtractResponse:
     data = await file.read(MAX_BYTES + 1)

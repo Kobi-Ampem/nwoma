@@ -39,6 +39,15 @@ Resources:
           ALLOWED_ORIGINS: !Ref AllowedOrigins
       FunctionUrlConfig:
         AuthType: NONE  # a public demo; CORS is enforced by the app for the review UI
+      Events:
+        # Cold starts load ~1 GB lazily from the image and take minutes. A ping every 5 minutes
+        # keeps one instance loaded. Free: scheduled rules cost nothing, and ~8,640 short
+        # invocations a month are far inside Lambda's free tier.
+        KeepWarm:
+          Type: Schedule
+          Properties:
+            Schedule: rate(5 minutes)
+            Description: Keeps one nwoma-api instance loaded
       LoggingConfig:
         LogGroup: !Ref ApiLogs
       Tags:
