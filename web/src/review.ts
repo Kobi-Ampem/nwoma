@@ -35,8 +35,9 @@ export function fieldRows(ext: Extraction, docType: 'lab' | 'referral'): FieldRo
       { path: `results[${i}].flag`, label: 'Flag', value: r.flag ?? '', group },
     )
   })
+  // One group per diagnosis, like results: each carries its own ICD-10 code choice.
   ext.diagnoses.forEach((d, i) =>
-    rows.push({ path: `diagnoses[${i}]`, label: `Diagnosis ${i + 1}`, value: d, group: 'Diagnoses' }),
+    rows.push({ path: `diagnoses[${i}]`, label: 'As written', value: d, group: `Diagnosis ${i + 1}: ${d || 'unnamed'}` }),
   )
   ext.medications.forEach((m, i) => {
     const group = `Medication ${i + 1}`

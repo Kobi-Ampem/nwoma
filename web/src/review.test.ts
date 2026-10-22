@@ -38,4 +38,10 @@ describe('review', () => {
     expect(byPath['results[0].ref_range']).toBe('70 -\n99')
     expect(byPath['results[0].flag']).toBeUndefined() // one letter: too short to place safely
   })
+
+  it('gives every diagnosis its own group, so each gets a code choice', () => {
+    const letter = { ...lab, results: [], diagnoses: ['Anémie', 'Obésité'] }
+    const groups = new Set(fieldRows(letter, 'referral').filter((r) => r.path.startsWith('diagnoses')).map((r) => r.group))
+    expect(groups.size).toBe(2)
+  })
 })
