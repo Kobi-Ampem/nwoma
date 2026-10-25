@@ -52,7 +52,7 @@ def build_bundle(req: FhirRequest, now: datetime | None = None) -> dict[str, Any
 
     def add(resource: dict[str, Any], key: str, fields: list[str]) -> str:
         url = f"urn:uuid:{uuid.uuid5(namespace, key)}"
-        entries.append({"fullUrl": url, "resource": resource})
+        entries.append({"fullUrl": url, "resource": _without_empty(resource)})
         fields_of[url] = fields
         return url
 
@@ -155,6 +155,17 @@ def build_bundle(req: FhirRequest, now: datetime | None = None) -> dict[str, Any
         "timestamp": now.isoformat(),
         "entry": entries,
     }
+
+
+def _without_empty(value: Any) -> Any:
+    """FHIR JSON forbids empty lists and objects ('reasonCode': [] is invalid): a field with
+    nothing in it is left out. Lenient libraries accept them; the official validator does not."""
+    if isinstance(value, dict):
+        kept = {k: _without_empty(v) for k, v in value.items()}
+        return {k: v for k, v in kept.items() if v not in ([], {})}
+    if isinstance(value, list):
+        return [_without_empty(v) for v in value]
+    return value
 
 
 def _row_fields(i: int, coded: bool) -> list[str]:

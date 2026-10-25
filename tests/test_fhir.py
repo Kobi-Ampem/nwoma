@@ -5,6 +5,7 @@ from fhir.resources.R4B.bundle import Bundle
 
 from api.fhir import ICD10CM, LOINC, FhirRequest, build_bundle
 from evals.oracle import oracle
+from extract.schema import ExtractedMedication, Extraction
 from tests.test_referral import _doc as _referral_doc
 from tests.test_score import _doc as _lab_doc
 
@@ -90,3 +91,27 @@ def test_only_confirmed_codes_are_marked_as_chosen_by_a_person() -> None:
     first, second = _resources(bundle, "Observation")[:2]
     assert first["code"]["coding"][0]["userSelected"] is True
     assert "userSelected" not in second["code"]["coding"][0]
+
+
+def _empty_paths(value: Any, path: str = "") -> list[str]:
+    if value in ([], {}):
+        return [path]
+    if isinstance(value, dict):
+        return [p for k, v in value.items() for p in _empty_paths(v, f"{path}.{k}")]
+    if isinstance(value, list):
+        return [p for i, v in enumerate(value) for p in _empty_paths(v, f"{path}[{i}]")]
+    return []
+
+
+def test_a_bundle_never_contains_empty_lists() -> None:
+    # No reason, no diagnoses, a medication without dose or frequency: each once gave '[]'.
+    ext = Extraction(
+        patient_name="Ama Mensah",
+        birth_date="05/04/1990",
+        sex="F",
+        clinician=None,
+        medications=[ExtractedMedication(name="Paracetamol", dose=None, frequency=None)],
+    )
+    bundle = build_bundle(FhirRequest(doc_id="d1", doc_type="referral", extraction=ext), NOW)
+    Bundle.model_validate(bundle)
+    assert _empty_paths(bundle) == []
