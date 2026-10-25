@@ -20,6 +20,7 @@ and its caches (209 MB). The service takes about 14 s to start and peaks at 2.85
 | SSM Parameter Store (standard) | The Gemini key | $0 |
 | CloudWatch Logs, 7-day retention | Debugging | $0 |
 | AWS Budgets + SNS + a 15-line kill-switch function | Enforces the cap | $0 |
+| One CloudWatch alarm on compute time | Trips the kill switch within minutes | $0 (free tier: 10 alarms) |
 
 About $0.25 a month in total. Two CloudFormation stacks: `infra/bootstrap.yaml`, created once
 by an admin in the console (deploy role, ECR, bucket, key parameter, cost guard), and
@@ -30,6 +31,14 @@ pause could cost tens of dollars a month. So the budget's 90% alarm publishes to
 runs a function that sets the API's reserved concurrency to 0, switching it off. The cost guard
 lives in the admin stack, so a deploy cannot remove it. The budget counts only resources tagged
 `project=nwoma`, which needs the tag activated once in Billing > Cost allocation tags.
+
+**Budget figures lag; usage does not** (added 25 Oct 2026, after an audit). Budgets update a few
+times a day, so on their own they could let a day of nonstop abuse through: up to 10 copies of a
+3 GB function running all day is roughly $35 to $40. A CloudWatch alarm on the function's
+`Duration` (compute milliseconds, which is what Lambda bills) publishes to the same kill switch
+when it passes 600 seconds in any 5 minutes, more than two requests running nonstop. Normal demo
+use stays far below that. Once tripped, the API stays off until reset by hand with
+`aws lambda delete-function-concurrency --function-name nwoma-api`, and an email says so.
 
 Lambda Web Adapter runs the FastAPI app unchanged, with asynchronous initialisation for the
 14 s start-up.
