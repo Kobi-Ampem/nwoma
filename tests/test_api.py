@@ -67,3 +67,19 @@ def test_samples_cannot_escape_their_folder() -> None:
 
 def test_the_keep_warm_ping_is_answered() -> None:
     assert _client().post("/events", json={"source": "aws.events"}).json() == {"status": "warm"}
+
+
+def test_validate_reflects_the_reviewers_edits() -> None:
+    body: dict[str, Any] = {
+        "doc_type": "lab",
+        "extraction": {"patient_name": "Ama Mensah", "birth_date": "05/04/1990", "sex": "F",
+                       "clinician": None, "collection_date": None,
+                       "results": [{"test_name": "Glucose", "value": "140", "unit": "mg/dL",
+                                    "ref_range": "70 - 99", "flag": None}]},
+    }  # fmt: skip
+    client = _client()
+    before = {i["field"] for i in client.post("/validate", json=body).json()}
+    assert before == {"collection_date", "results[0].flag"}
+    body["extraction"]["collection_date"] = "21/03/2024"
+    body["extraction"]["results"][0]["flag"] = "H"
+    assert client.post("/validate", json=body).json() == []

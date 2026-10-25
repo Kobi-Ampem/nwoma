@@ -4,6 +4,7 @@
 
 POST /extract   a PDF or image (max 5 MB) -> fields, issues for review, code suggestions
 POST /codes     fresh code suggestions after a reviewer edits a name, unit or diagnosis
+POST /validate  the validator's issues for an extraction as the reviewer has edited it
 POST /fhir      a reviewed extraction -> FHIR R4 Bundle with Provenance
 GET  /samples   synthetic sample documents to try
 GET  /health    liveness, and whether the LLM fallback is on
@@ -22,7 +23,17 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from api.fhir import FhirRequest, build_bundle
-from api.service import MAX_BYTES, CodeSuggestion, ExtractResponse, Nwoma, UnsupportedDocument
+from api.service import (
+    MAX_BYTES,
+    CodeSuggestion,
+    ExtractResponse,
+    IssueOut,
+    Nwoma,
+    UnsupportedDocument,
+)
+from extract.doctype import DocType
+from extract.schema import Extraction
+from extract.validate import validate
 
 SAMPLES = Path(__file__).parent / "samples"
 load_dotenv()  # local development; in AWS the settings come from the function's environment
@@ -88,6 +99,18 @@ def codes(request: Request, req: CodesRequest) -> list[CodeSuggestion]:
     if req.kind == "lab":
         return service.lab_codes(req.text, req.unit)
     return service.diagnosis_codes(req.text)
+
+
+class ValidateRequest(BaseModel):
+    doc_type: DocType
+    extraction: Extraction
+
+
+@app.post("/validate")
+def check(req: ValidateRequest) -> list[IssueOut]:
+    """The same checks as at extraction, run again on the reviewer's edits: a fixed field stops
+    being flagged, and an edit that breaks one (a flag the new value contradicts) is caught."""
+    return [IssueOut(**i.__dict__) for i in validate(req.extraction, req.doc_type)]
 
 
 @app.post("/fhir")
