@@ -157,10 +157,6 @@ def build_bundle(req: FhirRequest, now: datetime | None = None) -> dict[str, Any
     }
 
 
-def _diagnosis_fields(i: int, coded: bool) -> list[str]:
-    return [f"diagnoses[{i}]", f"diagnoses[{i}].code"] if coded else [f"diagnoses[{i}]"]
-
-
 def _row_fields(i: int, coded: bool) -> list[str]:
     fields = [f"results[{i}].{f}" for f in ("test_name", "value", "unit", "ref_range", "flag")]
     return [*fields, f"results[{i}].code"] if coded else fields
