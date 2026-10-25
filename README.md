@@ -81,7 +81,10 @@ Each is recorded in [`docs/adr/`](docs/adr/):
   unseen orders, confidently. Routing uses validator checks, not confidence.
 - **Minimal AWS, hard cost cap** (ADR 0003): one Lambda container behind a function URL, about
   $0.25 a month, with a budget alarm that switches the API off at $1.99.
-- **Nothing is stored.** A document is read, answered and forgotten. No accounts: they would mean
+- **Nwoma stores nothing.** A document is read, answered and forgotten. The exception to know
+  about: documents that fail a validator check are sent to Google's Gemini API, and its free
+  tier may keep what it receives, so the public demo takes test documents only. A paid tier or
+  a self-hosted model removes that. No accounts: they would mean
   storing regulated health data (HDS in France, HIPAA in the US, Ghana's Data Protection Act).
   Nwoma converts documents; the hospital's records system stores and shares them, and FHIR is
   what those systems import.
