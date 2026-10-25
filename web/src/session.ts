@@ -1,9 +1,10 @@
-import type { CodeSuggestion, ExtractResponse, Extraction } from './api'
+import type { CodeSuggestion, ExtractResponse, Extraction, Issue } from './api'
 
 // One document under review. Held in the browser only: nothing is sent back until export.
 export interface Session {
   response: ExtractResponse
   ext: Extraction // as edited by the reviewer
+  issues: Issue[] // the validator's view of ext, refreshed after edits
   confirmed: Set<string> // field paths, and '<item>.code' for confirmed codes
   codes: Record<string, string> // 'results[3]' / 'diagnoses[0]' -> chosen code ('' = none)
   suggestions: Record<string, CodeSuggestion[]>
@@ -16,6 +17,7 @@ export function startSession(response: ExtractResponse, file: Blob, fileName: st
   return {
     response,
     ext: response.extraction,
+    issues: response.issues,
     confirmed: new Set(),
     // The top suggestion is preselected but not confirmed: the reviewer has to accept it.
     codes: Object.fromEntries(Object.entries(response.codes).map(([k, v]) => [k, v[0]?.code ?? ''])),

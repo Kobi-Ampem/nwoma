@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { type CodeSuggestion, suggestCodes } from '../api'
+import { type CodeSuggestion, suggestCodes, validate } from '../api'
 import { DocumentViewer } from '../components/DocumentViewer'
 import { ExportPanel } from '../components/ExportPanel'
 import { HEADER_FIELDS, allPaths, codeKeyAffectedBy, fieldRows, itemPaths, setField } from '../review'
@@ -45,9 +45,10 @@ export function Review(props: { session: Session; update: Update; reviewer: stri
   const { response, ext, confirmed, codes, suggestions } = session
   const [active, setActive] = useState<string | null>(null)
   const timers = useRef<Record<string, number>>({})
+  const checks = useRef(0) // numbers each re-validation, so a slow, older reply cannot win
 
   const rows = useMemo(() => fieldRows(ext, response.doc_type), [ext, response.doc_type])
-  const issues = useMemo(() => new Map(response.issues.map((i) => [i.field, i.message])), [response.issues])
+  const issues = useMemo(() => new Map(session.issues.map((i) => [i.field, i.message])), [session.issues])
   const paths = useMemo(() => allPaths(ext, response.doc_type, codes), [ext, response.doc_type, codes])
   const done = paths.filter((p) => confirmed.has(p)).length
 
@@ -56,6 +57,7 @@ export function Review(props: { session: Session; update: Update; reviewer: stri
   // An edit to a test name, unit or diagnosis unconfirms its code and fetches fresh suggestions.
   function edit(path: string, value: string) {
     const key = codeKeyAffectedBy(path)
+    recheck(setField(ext, path, value))
     update((s) => {
       const next = new Set(s.confirmed)
       next.add(path)
@@ -79,6 +81,20 @@ export function Review(props: { session: Session; update: Update; reviewer: stri
         }))
       } catch {
         // Suggestions stay as they were; the code is still unconfirmed, so nothing is exported as checked.
+      }
+    }, 600)
+  }
+
+  // Runs the validator again once typing pauses, so the issue list matches what is on screen.
+  function recheck(next: typeof ext) {
+    window.clearTimeout(timers.current.validate)
+    timers.current.validate = window.setTimeout(async () => {
+      const id = ++checks.current
+      try {
+        const fresh = await validate(response.doc_type, next)
+        if (id === checks.current) update((s) => ({ ...s, issues: fresh }))
+      } catch {
+        // The previous issues stay: they may be out of date, but nothing is lost.
       }
     }, 600)
   }
@@ -140,15 +156,15 @@ export function Review(props: { session: Session; update: Update; reviewer: stri
         </a>
       </div>
 
-      {response.issues.length > 0 ? (
+      {session.issues.length > 0 ? (
         <div className="callout" role="status">
           <span aria-hidden>⚠</span>
           <div>
             <b>
-              {response.issues.length} field{response.issues.length > 1 ? 's' : ''} need attention
+              {session.issues.length} field{session.issues.length > 1 ? 's' : ''} need attention
             </b>
             <ul>
-              {response.issues.map((i) => (
+              {session.issues.map((i) => (
                 <li key={i.field + i.kind}>
                   <button onClick={() => jump(i.field)}>{i.message}</button>
                 </li>

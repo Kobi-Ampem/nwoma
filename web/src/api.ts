@@ -101,6 +101,16 @@ export async function suggestCodes(
   return (await check(response)).json()
 }
 
+// The validator again, on the extraction as edited: fixed fields stop being flagged.
+export async function validate(docType: DocType, extraction: Extraction): Promise<Issue[]> {
+  const response = await fetch(`${API_URL}/validate`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ doc_type: docType, extraction }),
+  })
+  return (await check(response)).json()
+}
+
 export interface FhirRequest {
   doc_id: string
   doc_type: DocType
