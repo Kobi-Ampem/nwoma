@@ -46,6 +46,7 @@ export function Review(props: { session: Session; update: Update; reviewer: stri
   const [active, setActive] = useState<string | null>(null)
   const timers = useRef<Record<string, number>>({})
   const checks = useRef(0) // numbers each re-validation, so a slow, older reply cannot win
+  const lookups = useRef<Record<string, number>>({}) // the same, per item, for code suggestions
 
   const rows = useMemo(() => fieldRows(ext, response.doc_type), [ext, response.doc_type])
   const issues = useMemo(() => new Map(session.issues.map((i) => [i.field, i.message])), [session.issues])
@@ -72,8 +73,10 @@ export function Review(props: { session: Session; update: Update; reviewer: stri
         ? session.ext.results[Number(key.match(/\d+/)![0])]
         : undefined
       const latest = path.endsWith('.unit') ? { name: target?.test_name ?? '', unit: value } : { name: value, unit: target?.unit ?? null }
+      const id = (lookups.current[key] = (lookups.current[key] ?? 0) + 1)
       try {
         const fresh = await suggestCodes(kind, latest.name, kind === 'lab' ? latest.unit : null)
+        if (id !== lookups.current[key]) return // a newer edit has its own lookup on the way
         update((s) => ({
           ...s,
           suggestions: { ...s.suggestions, [key]: fresh },
