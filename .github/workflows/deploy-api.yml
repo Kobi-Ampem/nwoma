@@ -8,19 +8,24 @@ on:
     paths: [api/**, extract/**, normalise/**, ocr/**, datagen/models.py, infra/template.yaml, Dockerfile, pyproject.toml, uv.lock]
   workflow_dispatch:
 
-permissions:
-  id-token: write  # short-lived AWS credentials through OIDC; no stored keys
-  contents: read
-
 concurrency: deploy-api
 
 env:
   AWS_REGION: eu-west-3
 
 jobs:
+  test:  # a commit that fails the tests never reaches AWS
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
   deploy:
+    needs: test
     if: vars.AWS_DEPLOY_ROLE_ARN != ''
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # short-lived AWS credentials through OIDC; no stored keys
+      contents: read
     steps:
       - uses: actions/checkout@v7
       - uses: aws-actions/configure-aws-credentials@v6

@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_call:  # the deploy workflows run these checks first and deploy only if they pass
+
+permissions:
+  contents: read
 
 jobs:
   python:
