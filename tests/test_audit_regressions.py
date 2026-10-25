@@ -88,6 +88,16 @@ def test_too_many_pages_are_refused() -> None:
         read_pdf(buffer.getvalue())
 
 
+def test_ocr_stops_when_the_document_budget_is_spent(monkeypatch: pytest.MonkeyPatch) -> None:
+    # 25 Oct audit: 5 pages x 30 s of OCR alone could pass Lambda's 120 s limit.
+    monkeypatch.setattr("ocr.text_layer.OCR_BUDGET_S", 0)
+    page = Image.new("L", (200, 280), 255)  # blank, so it needs OCR
+    buffer = io.BytesIO()
+    page.save(buffer, format="PDF")
+    with pytest.raises(UnreadableDocument, match="too long"):
+        read_pdf(buffer.getvalue())
+
+
 def test_the_service_turns_unreadable_files_into_client_errors() -> None:
     service = Nwoma.__new__(Nwoma)  # read() needs no models
     with pytest.raises(UnsupportedDocument):

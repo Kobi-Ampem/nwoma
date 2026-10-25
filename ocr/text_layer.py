@@ -8,6 +8,7 @@ pixels, and a time limit on every OCR call. A small file can still decode into a
 import io
 import os
 import subprocess
+import time
 from typing import Literal
 
 import pdfplumber
@@ -21,7 +22,10 @@ OCR_DPI = 200
 MAX_PAGES = 5  # lab reports and referral letters are one or two pages
 MAX_PAGE_POINTS = 1500  # ~53 cm: larger than any real report page (A4 is 595 x 842)
 MAX_IMAGE_PIXELS = 25_000_000  # ~A4 at 600 dpi
-OCR_TIMEOUT_S = 30
+OCR_TIMEOUT_S = 30  # one page
+# The whole document. With Gemini's worst case (2 tries of 20 s) and the rest of the pipeline,
+# a request stays inside Lambda's 120 s limit; past it, Lambda would cut the request off.
+OCR_BUDGET_S = 50
 
 
 class UnreadableDocument(ValueError):
@@ -33,7 +37,7 @@ def pdf_text(pdf: bytes) -> str:
         return "\n".join(page.extract_text() or "" for page in doc.pages)
 
 
-def ocr_image(image: Image.Image, langs: str = "eng+fra") -> str:
+def ocr_image(image: Image.Image, langs: str = "eng+fra", timeout: float = OCR_TIMEOUT_S) -> str:
     """Run Tesseract on one page image. PSM 6 reads the page as one block of text, which keeps
     each table row on one line.
 
@@ -48,7 +52,7 @@ def ocr_image(image: Image.Image, langs: str = "eng+fra") -> str:
             capture_output=True,
             check=True,
             env={**os.environ, "OMP_THREAD_LIMIT": "1"},
-            timeout=OCR_TIMEOUT_S,
+            timeout=timeout,
         )
     except subprocess.TimeoutExpired as e:
         raise UnreadableDocument("a page took too long to read") from e
@@ -65,6 +69,7 @@ def read_pdf(pdf: bytes) -> tuple[str, TextSource]:
     not hide scanned pages behind it. Pages are handled one at a time to bound memory."""
     texts: list[str] = []
     used_ocr = False
+    deadline = time.monotonic() + OCR_BUDGET_S
     try:
         with pdfplumber.open(io.BytesIO(pdf)) as doc:
             if len(doc.pages) > MAX_PAGES:
@@ -75,7 +80,10 @@ def read_pdf(pdf: bytes) -> tuple[str, TextSource]:
                 text = page.extract_text() or ""
                 if len(text.strip()) < _MIN_TEXT_LAYER_CHARS:
                     image = page.to_image(resolution=OCR_DPI).original.convert("L")
-                    text = ocr_image(image)
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise UnreadableDocument("the document took too long to read")
+                    text = ocr_image(image, timeout=min(OCR_TIMEOUT_S, remaining))
                     used_ocr = True
                 texts.append(text)
     except UnreadableDocument:

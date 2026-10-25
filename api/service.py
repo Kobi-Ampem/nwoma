@@ -71,9 +71,10 @@ class Nwoma:
         llm = None
         if os.environ.get("GEMINI_API_KEY", "none").strip() not in ("", "none"):
             model = llm_model or os.environ.get("GEMINI_MODEL", "gemini-3.5-flash-lite")
-            # No disk cache (nothing is stored) and a short budget: 2 tries of 25 s at most, so a
-            # Gemini outage ends in the local answer well inside Lambda's 120 s timeout.
-            llm = GeminiExtractor(model, None, retries=2, timeout_ms=25_000)
+            # No disk cache (nothing is stored) and a short budget: 2 tries of 20 s at most. With
+            # OCR capped at 50 s (ocr.text_layer.OCR_BUDGET_S), a Gemini outage still ends in the
+            # local answer inside Lambda's 120 s timeout.
+            llm = GeminiExtractor(model, None, retries=2, timeout_ms=20_000)
         self.cascade = Cascade(NerExtractor.from_onnx(model_dir), llm)
 
     @property
