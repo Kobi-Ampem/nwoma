@@ -81,7 +81,7 @@ class Nwoma:
     def llm_enabled(self) -> bool:
         return self.cascade.llm is not None
 
-    def read(self, data: bytes, filename: str = "") -> tuple[str, Literal["text_layer", "ocr"]]:
+    def read(self, data: bytes) -> tuple[str, Literal["text_layer", "ocr"]]:
         if len(data) > MAX_BYTES:
             raise UnsupportedDocument("documents are limited to 5 MB")
         try:
@@ -91,10 +91,10 @@ class Nwoma:
         except UnreadableDocument as e:
             raise UnsupportedDocument(str(e)) from e
 
-    def extract(self, data: bytes, filename: str = "") -> ExtractResponse:
+    def extract(self, data: bytes) -> ExtractResponse:
         start = time.perf_counter()
         doc_id = hashlib.sha256(data).hexdigest()[:12]
-        text, text_source = self.read(data, filename)
+        text, text_source = self.read(data)
         result = self.cascade.run(doc_id, text)
         return ExtractResponse(
             doc_id=doc_id,

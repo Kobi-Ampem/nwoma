@@ -80,7 +80,7 @@ def extract(request: Request, file: Annotated[UploadFile, File()]) -> ExtractRes
     if len(data) > MAX_BYTES:
         raise HTTPException(413, "documents are limited to 5 MB")
     try:
-        return _nwoma(request).extract(data, file.filename or "")
+        return _nwoma(request).extract(data)
     except UnsupportedDocument as e:
         raise HTTPException(415, str(e)) from e
 

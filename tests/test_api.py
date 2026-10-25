@@ -12,7 +12,7 @@ from extract.schema import Extraction
 class _FakeNwoma:
     llm_enabled = False
 
-    def extract(self, data: bytes, filename: str = "") -> ExtractResponse:
+    def extract(self, data: bytes) -> ExtractResponse:
         if not data.startswith(b"%PDF-"):
             raise UnsupportedDocument("not a PDF or an image")
         ext = Extraction(

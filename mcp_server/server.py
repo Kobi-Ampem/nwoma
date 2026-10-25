@@ -46,7 +46,7 @@ def extract_document(path: str) -> dict[str, Any]:
         raise ValueError(f"no file at {file}")
     if file.stat().st_size > MAX_BYTES:
         raise ValueError("documents are limited to 5 MB")
-    return _nwoma().extract(file.read_bytes(), file.name).model_dump()
+    return _nwoma().extract(file.read_bytes()).model_dump()
 
 
 @server.tool()
