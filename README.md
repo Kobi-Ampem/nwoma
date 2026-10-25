@@ -93,7 +93,8 @@ Each is recorded in [`docs/adr/`](docs/adr/):
 
 ## Business model
 
-Business design for the pitch; only the Free behaviour is built.
+Business design for the pitch: tiers, quotas and billing are not built. The public demo runs
+the full cascade, Gemini fallback included, so visitors see the whole pipeline.
 
 | Tier | Price | What it includes |
 |---|---|---|
@@ -123,7 +124,7 @@ Python 3.12 with [uv](https://docs.astral.sh/uv/), Tesseract with English and Fr
 
 ```bash
 uv sync
-uv run pytest                     # 142 tests
+uv run pytest                     # the test suite (no models needed)
 uv run uvicorn api.app:app        # API on :8000 (needs models/ner and data/; see below)
 cd web && npm ci && npm run dev   # review app on :5173
 ```
