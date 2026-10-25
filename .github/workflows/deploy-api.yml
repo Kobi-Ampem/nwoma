@@ -58,5 +58,19 @@ jobs:
             --image-repository ${{ vars.ECR_REPOSITORY_URI }} \
             --parameter-overrides ImageUri=${{ steps.image.outputs.uri }} ReservedConcurrency=${{ vars.RESERVED_CONCURRENCY || '1' }} \
             --tags project=nwoma --no-confirm-changeset --no-fail-on-empty-changeset
-          aws cloudformation describe-stacks --stack-name nwoma-api \
-            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text
+      - name: Smoke test the live API with a sample document
+        # CI tests run without the trained models; this is the first time they run end to end.
+        # A new image cold-starts in minutes, so the first tries may time out.
+        run: |
+          url=$(aws cloudformation describe-stacks --stack-name nwoma-api \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiUrl'].OutputValue" --output text)
+          for try in 1 2 3 4 5 6 7 8; do
+            if curl -sf -m 150 -F file=@api/samples/lab-report-en-digital.pdf "${url%/}/extract" -o reply.json \
+              && jq -e '.doc_type == "lab" and (.extraction.results | length) > 0' reply.json; then
+              echo "The API extracted $(jq '.extraction.results | length' reply.json) results"
+              exit 0
+            fi
+            echo "Try $try failed; the function may still be starting"
+            sleep 30
+          done
+          exit 1
