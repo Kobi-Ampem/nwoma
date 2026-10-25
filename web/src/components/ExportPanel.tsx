@@ -34,7 +34,9 @@ export function ExportPanel(props: { session: Session; reviewer: string; setRevi
       link.href = URL.createObjectURL(blob)
       link.download = `nwoma-${response.doc_id}.fhir.json`
       link.click()
-      URL.revokeObjectURL(link.href)
+      // Released a moment later: some browsers (Safari, older Firefox) start the download after
+      // click() returns and would find the file already gone.
+      window.setTimeout(() => URL.revokeObjectURL(link.href), 1000)
     } catch (e) {
       setError(explain(e))
     } finally {
