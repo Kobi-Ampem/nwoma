@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Extraction } from './api'
-import { allPaths, codeKeyAffectedBy, fieldRows, itemPaths, locate, setField } from './review'
+import { allPaths, codeKeyAffectedBy, exportedCodes, fieldRows, itemPaths, locate, setField } from './review'
 
 const lab: Extraction = {
   patient_name: 'MENSAH Ama',
@@ -58,5 +58,11 @@ describe('review', () => {
     expect(byPath['patient_name']).toBe('MENSAH Ama')
     expect(byPath['results[0].ref_range']).toBe('70 -\n99')
     expect(byPath['results[0].flag']).toBeUndefined() // one letter: too short to place safely
+  })
+
+  it('exports only the codes the reviewer confirmed', () => {
+    const codes = { 'results[0]': '2345-7', 'results[1]': '2951-2', 'diagnoses[0]': '' }
+    const confirmed = new Set(['results[0].code', 'diagnoses[0].code'])
+    expect(exportedCodes(codes, confirmed)).toEqual({ 'results[0]': '2345-7' })
   })
 })

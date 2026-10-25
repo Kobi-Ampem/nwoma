@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { explain, toFhir } from '../api'
-import { allPaths } from '../review'
+import { allPaths, exportedCodes } from '../review'
 import type { Session } from '../session'
 
 // The last section of the review workspace: who reviewed, and the two outputs.
@@ -25,7 +25,7 @@ export function ExportPanel(props: { session: Session; reviewer: string; setRevi
         doc_id: response.doc_id,
         doc_type: response.doc_type,
         extraction: ext,
-        codes: Object.fromEntries(codeKeys.map((k) => [k, codes[k]])),
+        codes: exportedCodes(codes, confirmed),
         confirmed: [...confirmed],
         reviewer: reviewer.trim() || null,
       })
@@ -57,7 +57,7 @@ export function ExportPanel(props: { session: Session; reviewer: string; setRevi
           {needsName ? (
             <span className="hint">Your confirmations are recorded under your name.</span>
           ) : (
-            <span className="muted small">Unconfirmed fields are exported as machine-extracted.</span>
+            <span className="muted small">Unconfirmed fields are exported as machine-extracted; unconfirmed codes are left out.</span>
           )}
         </div>
         <div className="download">

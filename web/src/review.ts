@@ -66,6 +66,13 @@ export function allPaths(ext: Extraction, docType: DocType, codes: Record<string
   return paths
 }
 
+// The codes that go into the export: only those the reviewer confirmed. The top suggestion is
+// preselected for convenience and is right first time only about half the time, so an
+// unconfirmed one must not reach a records system looking like a chosen code.
+export function exportedCodes(codes: Record<string, string>, confirmed: Set<string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(codes).filter(([k, code]) => code && confirmed.has(`${k}.code`)))
+}
+
 const PATH = /^(\w+)(?:\[(\d+)\])?(?:\.(\w+))?$/
 
 // A copy of the extraction with one field changed. Empty text becomes null where allowed.
