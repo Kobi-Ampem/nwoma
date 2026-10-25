@@ -2,7 +2,7 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: >-
   Nwoma, one-time setup (create once, as an admin, in the CloudFormation console): the GitHub
   deploy role, the image registry, the private build-inputs bucket, the Gemini key parameter and
-  the cost guard (a $1.99 monthly budget whose alarm switches the API off).
+  the cost guard (a usage alarm and a $1.99 monthly budget, either of which switches the API off).
 
 Parameters:
   GitHubSubjectPrefix:
@@ -23,6 +23,12 @@ Parameters:
   MonthlyLimitUsd:
     Type: String
     Default: "1.99"
+  UsageLimitSeconds:
+    Type: Number
+    Default: 600
+    Description: >-
+      Compute seconds in any 5 minutes that switch the API off. 600 means more than two
+      requests running nonstop; normal demo use stays far below it.
 
 Conditions:
   CreateOidc: !Equals [!Ref CreateOidcProvider, "true"]
@@ -230,7 +236,11 @@ Resources:
       Value: none
       Tags: {project: nwoma}
 
-  # --- Cost guard: AWS has no hard spending cap, so the alarm switches the API off ------------
+  # --- Cost guard: AWS has no hard spending cap, so alarms switch the API off ----------------
+  # Two triggers. The budget sees money, but its figures lag by hours: a public URL running
+  # nonstop could spend tens of dollars first. The usage alarm sees compute time within minutes.
+  # Once tripped, the API stays off until reset by hand:
+  #   aws lambda delete-function-concurrency --function-name nwoma-api
   KillSwitchTopic:
     Type: AWS::SNS::Topic
     Properties:
@@ -244,10 +254,19 @@ Resources:
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
-          - Effect: Allow
+          - Sid: BudgetAlarm
+            Effect: Allow
             Principal: {Service: budgets.amazonaws.com}
             Action: SNS:Publish
             Resource: !Ref KillSwitchTopic
+          - Sid: UsageAlarm
+            Effect: Allow
+            Principal: {Service: cloudwatch.amazonaws.com}
+            Action: SNS:Publish
+            Resource: !Ref KillSwitchTopic
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
 
   KillSwitchRole:
     Type: AWS::IAM::Role
@@ -305,6 +324,35 @@ Resources:
       Action: lambda:InvokeFunction
       Principal: sns.amazonaws.com
       SourceArn: !Ref KillSwitchTopic
+
+  # So Kobi knows the API was switched off, by either trigger. AWS emails a confirmation link
+  # once; the subscription is active only after it is clicked.
+  KillSwitchEmail:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref KillSwitchTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+  UsageAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: nwoma-api-usage
+      AlarmDescription: >-
+        The API ran for more than the usage limit in 5 minutes: likely abuse. Switches it off.
+      Namespace: AWS/Lambda
+      MetricName: Duration  # milliseconds of compute, which is what Lambda bills
+      Dimensions:
+        - {Name: FunctionName, Value: nwoma-api}
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: !Sub "${UsageLimitSeconds}000"
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching  # no requests is not a problem
+      AlarmActions: [!Ref KillSwitchTopic]
+      Tags:
+        - {Key: project, Value: nwoma}
 
   Budget:
     Type: AWS::Budgets::Budget
