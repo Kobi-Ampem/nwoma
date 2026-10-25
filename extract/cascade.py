@@ -1,7 +1,8 @@
 """The extraction cascade the API runs: local NER first, the LLM only when the validator objects.
 
-On the 500-document evaluation sample this matches Gemini's F1 (0.956) while sending a third of
-documents to it, and gets more documents fully right than either extractor alone (62.2%).
+On the 500-document evaluation sample this matches Gemini's F1 (0.955) while sending a third of
+documents to it, and gets more documents fully right than either extractor alone (62.0%).
+Figures from evals/results/cascade.json.
 Without an LLM (the Free tier, or no key configured) the NER result is returned with its issues
 for the reviewer.
 """
