@@ -194,9 +194,7 @@ def _patient(ext: Extraction) -> dict[str, Any]:
 
 def _observation(req: FhirRequest, i: int, subject: dict[str, str]) -> dict[str, Any]:
     r = req.extraction.results[i]
-    code: dict[str, Any] = {"text": r.test_name}
-    if chosen := req.codes.get(f"results[{i}]"):
-        code["coding"] = [{"system": LOINC, "code": chosen}]
+    code: dict[str, Any] = {"text": r.test_name} | _coding(req, f"results[{i}]", LOINC)
     obs: dict[str, Any] = {
         "resourceType": "Observation",
         "status": "final",
@@ -238,10 +236,22 @@ def _observation(req: FhirRequest, i: int, subject: dict[str, str]) -> dict[str,
     return obs
 
 
+def _coding(req: FhirRequest, key: str, system: str) -> dict[str, Any]:
+    """The chosen code, if any. `userSelected` is FHIR's mark for a code a person picked: it is
+    set only when the reviewer confirmed it, so a machine suggestion is never mistaken for one."""
+    chosen = req.codes.get(key)
+    if not chosen:
+        return {}
+    coding: dict[str, Any] = {"system": system, "code": chosen}
+    if f"{key}.code" in req.confirmed:
+        coding["userSelected"] = True
+    return {"coding": [coding]}
+
+
 def _condition(req: FhirRequest, i: int, subject: dict[str, str]) -> dict[str, Any]:
-    code: dict[str, Any] = {"text": req.extraction.diagnoses[i]}
-    if chosen := req.codes.get(f"diagnoses[{i}]"):
-        code["coding"] = [{"system": ICD10CM, "code": chosen}]
+    code: dict[str, Any] = {"text": req.extraction.diagnoses[i]} | _coding(
+        req, f"diagnoses[{i}]", ICD10CM
+    )
     return {
         "resourceType": "Condition",
         "clinicalStatus": {

@@ -74,3 +74,19 @@ def test_the_same_input_gives_the_same_bundle() -> None:
     doc = _lab_doc("lab_en_01")
     req = FhirRequest(doc_id=doc.doc_id, doc_type="lab", extraction=oracle(doc))
     assert build_bundle(req, NOW) == build_bundle(req, NOW)
+
+
+def test_only_confirmed_codes_are_marked_as_chosen_by_a_person() -> None:
+    doc = _lab_doc("lab_fr_01")
+    req = FhirRequest(
+        doc_id=doc.doc_id,
+        doc_type="lab",
+        extraction=oracle(doc),
+        codes={"results[0]": "718-7", "results[1]": "4544-3"},
+        confirmed=["results[0].code"],
+    )
+    bundle = build_bundle(req, NOW)
+    Bundle.model_validate(bundle)
+    first, second = _resources(bundle, "Observation")[:2]
+    assert first["code"]["coding"][0]["userSelected"] is True
+    assert "userSelected" not in second["code"]["coding"][0]
