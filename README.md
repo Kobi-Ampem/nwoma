@@ -80,7 +80,8 @@ Each is recorded in [`docs/adr/`](docs/adr/):
 - **Route around the model's limit** (ADR 0002): the local model learns column order and fails on
   unseen orders, confidently. Routing uses validator checks, not confidence.
 - **Minimal AWS, hard cost cap** (ADR 0003): one Lambda container behind a function URL, about
-  $0.25 a month, with a budget alarm that switches the API off at $1.99.
+  $0.25 a month. A usage alarm switches the API off within minutes of abnormal load, and a
+  budget alarm at $1.99 backs it up.
 - **Nwoma stores nothing.** A document is read, answered and forgotten. The exception to know
   about: documents that fail a validator check are sent to Google's Gemini API, and its free
   tier may keep what it receives, so the public demo takes test documents only. A paid tier or
