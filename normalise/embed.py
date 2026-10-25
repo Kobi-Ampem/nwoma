@@ -11,20 +11,27 @@ import numpy as np
 import numpy.typing as npt
 
 MODEL = "intfloat/multilingual-e5-small"
+# A fixed version: an update upstream would change every vector, silently stale the embedding
+# caches, and could break the deployed image, which loads this exact snapshot offline.
+REVISION = "614241f622f53c4eeff9890bdc4f31cfecc418b3"
 _BATCH = 64
 _MAX_TOKENS = 64  # code names are short; truncating keeps batches fast
 
 
 class Embedder:
-    def __init__(self, model: str = MODEL) -> None:
+    def __init__(self, model: str = MODEL, revision: str = REVISION) -> None:
         import onnxruntime as ort
         from huggingface_hub import hf_hub_download
         from tokenizers import Tokenizer
 
-        self.tokenizer = Tokenizer.from_file(hf_hub_download(model, "onnx/tokenizer.json"))
+        self.tokenizer = Tokenizer.from_file(
+            hf_hub_download(model, "onnx/tokenizer.json", revision=revision)
+        )
         self.tokenizer.enable_truncation(_MAX_TOKENS)
         self.tokenizer.enable_padding()
-        self.session = ort.InferenceSession(hf_hub_download(model, "onnx/model.onnx"))
+        self.session = ort.InferenceSession(
+            hf_hub_download(model, "onnx/model.onnx", revision=revision)
+        )
         self.inputs = {i.name for i in self.session.get_inputs()}
 
     def encode(self, texts: Sequence[str], kind: str = "passage") -> npt.NDArray[np.float32]:
