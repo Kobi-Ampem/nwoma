@@ -134,8 +134,8 @@ export function Home(props: {
 
       <div className="container trust">
         <div className="card">
-          <h3>Nothing is stored</h3>
-          <p className="muted small">A document is read, answered and forgotten. Review happens in your browser.</p>
+          <h3>Nwoma stores nothing</h3>
+          <p className="muted small">Nwoma keeps nothing: a document is read, answered and forgotten, and review happens in your browser. Documents that fail a check are sent to Google's Gemini API.</p>
         </div>
         <div className="card">
           <h3>A person has the last word</h3>

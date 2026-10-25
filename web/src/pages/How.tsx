@@ -74,7 +74,7 @@ export function How() {
           <h2 style={{ fontSize: 18, marginBottom: 10 }}>Architecture and cost</h2>
           <p>One AWS Lambda container behind a function URL, deployed from GitHub Actions without stored keys. The review screen is this static site.</p>
           <ul>
-            <li>Nothing is stored: documents are read, answered and forgotten.</li>
+            <li>Nwoma stores nothing: documents are read, answered and forgotten. Documents that fail a check are sent to Google's Gemini API, whose free tier may keep them, which is one reason the demo takes test documents only.</li>
             <li>About {HEADLINE.costPerMonth} a month, with a budget alarm that switches the API off at $1.99.</li>
             <li>An MCP server offers the same tools to AI assistants.</li>
           </ul>
