@@ -5,6 +5,9 @@ import type { Session } from '../session'
 export function Summary({ session, reviewer }: { session: Session; reviewer: string }) {
   const { response, ext, confirmed, codes, suggestions } = session
   const display = (key: string) => suggestions[key]?.find((s) => s.code === codes[key])?.display ?? ''
+  // Like the FHIR export: an unconfirmed code is shown as a suggestion, never as the chosen code.
+  const code = (key: string) =>
+    !codes[key] ? '' : confirmed.has(`${key}.code`) ? `${codes[key]} ${display(key)}` : `Suggested, not checked: ${codes[key]}`
   const mark = (ok: boolean) => (ok ? '✓' : '')
   const rowOk = (key: string, fields: string[]) => fields.every((f) => confirmed.has(`${key}.${f}`))
   const [today] = useState(() => new Date().toISOString().slice(0, 10)) // fixed when the page opens
@@ -50,7 +53,7 @@ export function Summary({ session, reviewer }: { session: Session; reviewer: str
                     <td>{r.value} {r.unit}</td>
                     <td>{r.ref_range}</td>
                     <td>{r.flag}</td>
-                    <td>{codes[key] ? `${codes[key]} ${display(key)}` : ''}</td>
+                    <td>{code(key)}</td>
                     <td>{mark(rowOk(key, ['test_name', 'value', 'unit', 'ref_range', 'flag']))}</td>
                   </tr>
                 )
@@ -67,7 +70,7 @@ export function Summary({ session, reviewer }: { session: Session; reviewer: str
               {ext.diagnoses.map((d, i) => {
                 const key = `diagnoses[${i}]`
                 return (
-                  <tr key={key}><td>{d}</td><td>{codes[key] ? `${codes[key]} ${display(key)}` : ''}</td><td>{mark(confirmed.has(key))}</td></tr>
+                  <tr key={key}><td>{d}</td><td>{code(key)}</td><td>{mark(confirmed.has(key))}</td></tr>
                 )
               })}
             </tbody>
