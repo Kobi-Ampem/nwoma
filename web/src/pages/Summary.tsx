@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { itemPaths } from '../review'
 import type { Session } from '../session'
 
 // A printable summary for people; the FHIR bundle is the machine version of the same record.
@@ -9,7 +10,9 @@ export function Summary({ session, reviewer }: { session: Session; reviewer: str
   const code = (key: string) =>
     !codes[key] ? '' : confirmed.has(`${key}.code`) ? `${codes[key]} ${display(key)}` : `Suggested, not checked: ${codes[key]}`
   const mark = (ok: boolean) => (ok ? '✓' : '')
-  const rowOk = (key: string, fields: string[]) => fields.every((f) => confirmed.has(`${key}.${f}`))
+  // The same rule as the FHIR export: a row is checked when its fields, and its code if it has one,
+  // were all confirmed.
+  const checked = (key: string) => itemPaths(key, Boolean(codes[key])).every((p) => confirmed.has(p))
   const [today] = useState(() => new Date().toISOString().slice(0, 10)) // fixed when the page opens
 
   return (
@@ -54,7 +57,7 @@ export function Summary({ session, reviewer }: { session: Session; reviewer: str
                     <td>{r.ref_range}</td>
                     <td>{r.flag}</td>
                     <td>{code(key)}</td>
-                    <td>{mark(rowOk(key, ['test_name', 'value', 'unit', 'ref_range', 'flag']))}</td>
+                    <td>{mark(checked(key))}</td>
                   </tr>
                 )
               })}
@@ -70,7 +73,7 @@ export function Summary({ session, reviewer }: { session: Session; reviewer: str
               {ext.diagnoses.map((d, i) => {
                 const key = `diagnoses[${i}]`
                 return (
-                  <tr key={key}><td>{d}</td><td>{code(key)}</td><td>{mark(confirmed.has(key))}</td></tr>
+                  <tr key={key}><td>{d}</td><td>{code(key)}</td><td>{mark(checked(key))}</td></tr>
                 )
               })}
             </tbody>
@@ -80,7 +83,7 @@ export function Summary({ session, reviewer }: { session: Session; reviewer: str
             <tbody>
               {ext.medications.length === 0 && <tr><td className="muted">None listed</td></tr>}
               {ext.medications.map((m, i) => (
-                <tr key={i}><td>{m.name}</td><td>{m.dose}</td><td>{m.frequency}</td><td>{mark(rowOk(`medications[${i}]`, ['name', 'dose', 'frequency']))}</td></tr>
+                <tr key={i}><td>{m.name}</td><td>{m.dose}</td><td>{m.frequency}</td><td>{mark(checked(`medications[${i}]`))}</td></tr>
               ))}
             </tbody>
           </table>
